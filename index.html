@@ -18,12 +18,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot }
 //  🔧 KONFIGURACJA FIREBASE — wklej swoje dane
 // ═══════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey:            "AIzaSyAeTtdeqZM-V3zioFmdvZ2a49G54qeI4sw",
-  authDomain:        "wojdash-5f4c9.firebaseapp.com",
-  projectId:         "wojdash-5f4c9",
-  storageBucket:     "wojdash-5f4c9.firebasestorage.app",
-  messagingSenderId: "975323899690",
-  appId:             "1:975323899690:web:2aeb9c0a091f4292d06053"
+  apiKey:            "TWOJ_API_KEY",
+  authDomain:        "TWOJ_PROJECT.firebaseapp.com",
+  projectId:         "TWOJ_PROJECT_ID",
+  storageBucket:     "TWOJ_PROJECT.appspot.com",
+  messagingSenderId: "TWOJ_SENDER_ID",
+  appId:             "TWOJ_APP_ID"
 };
 
 const app  = initializeApp(firebaseConfig);
@@ -238,9 +238,42 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
   font-weight:600;text-decoration:none;border:1px solid rgba(0,229,255,.3);
   color:#fff;background:transparent;transition:all .2s;display:flex;align-items:center;gap:5px;}
 .chip-a:hover{background:rgba(0,229,255,.15);border-color:var(--neon);}
-.chip-del{background:transparent;border:none;color:rgba(255,107,107,.5);cursor:pointer;
-  font-size:10px;padding:0 0 0 2px;line-height:1;transition:color .2s;}
+.chip-del{background:transparent;border:none;color:rgba(255,107,107,.8);cursor:pointer;
+  font-size:12px;padding:0 0 0 4px;line-height:1;transition:color .2s;font-weight:700;}
 .chip-del:hover{color:var(--red);}
+
+/* LINKS TAB VIEW */
+.links-view{display:none;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);}
+.links-view.active{display:flex;}
+.links-top{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px 10px;border-bottom:1px solid var(--border);background:var(--panel);}
+.links-top-title{font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#fff;}
+.links-top-sub{font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:2px;}
+.links-grid{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;align-content:start;}
+.links-grid::-webkit-scrollbar{width:4px;}
+.links-grid::-webkit-scrollbar-thumb{background:rgba(0,229,255,.3);border-radius:2px;}
+.link-card{background:var(--card);border:1px solid rgba(255,255,255,.09);border-radius:10px;
+  padding:13px 14px;display:flex;align-items:flex-start;justify-content:space-between;
+  gap:8px;transition:border-color .2s;}
+.link-card:hover{border-color:rgba(0,229,255,.3);}
+.link-card-left{flex:1;min-width:0;}
+.link-card-name{font-size:12px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.link-card-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.link-card-url{font-family:var(--mono);font-size:9px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.link-card-url a{color:var(--neon);text-decoration:none;}
+.link-card-url a:hover{text-decoration:underline;}
+.link-card-actions{display:flex;gap:5px;flex-shrink:0;}
+.lc-open{padding:4px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;
+  color:var(--neon);border:1px solid rgba(0,229,255,.3);background:transparent;
+  text-decoration:none;transition:all .15s;white-space:nowrap;}
+.lc-open:hover{background:rgba(0,229,255,.12);}
+.lc-del{padding:4px 7px;border-radius:5px;font-size:11px;line-height:1;
+  color:var(--red);border:1px solid rgba(255,107,107,.25);background:transparent;cursor:pointer;transition:all .15s;}
+.lc-del:hover{background:rgba(255,107,107,.12);}
+.lc-novps{padding:3px 8px;border-radius:4px;font-family:var(--mono);font-size:8px;
+  color:var(--yellow);border:1px solid rgba(255,215,64,.2);background:transparent;white-space:nowrap;}
+.links-empty{font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px 4px;grid-column:1/-1;}
 .add-link-btn{padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;
   color:var(--neon);border:1px solid rgba(0,229,255,.3);background:transparent;cursor:pointer;transition:all .2s;}
 .add-link-btn:hover{background:rgba(0,229,255,.1);}
@@ -335,10 +368,24 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
     </div>
   </header>
 
-  <div class="tabs-bar" id="tabs-bar"></div>
+  <div class="tabs-bar" id="tabs-bar">
+    <button class="tab-btn" id="tab-links" onclick="switchTab('__links__')"><span class="ti">🔗</span>LINKI</button>
+  </div>
 
   <div class="body-area">
-    <div id="views-wrap" style="display:contents;"></div>
+    <div id="views-wrap" style="display:contents;">
+      <!-- LINKS VIEW — always rendered -->
+      <div class="links-view" id="pv-__links__">
+        <div class="links-top">
+          <div>
+            <div class="links-top-title">🔗 Moje Projekty i Linki</div>
+            <div class="links-top-sub">Wszystkie aplikacje, strony HTML, narzędzia — kliknij aby otworzyć</div>
+          </div>
+          <button class="add-btn" onclick="openLinkModal()">+ DODAJ PROJEKT / LINK</button>
+        </div>
+        <div class="links-grid" id="links-grid"></div>
+      </div>
+    </div>
 
     <div class="right-col">
       <!-- STATUS -->
@@ -396,11 +443,13 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
 <!-- ══ MODAL: LINK ══ -->
 <div class="ov" id="modal-link">
   <div class="modal">
-    <h3>➕ Dodaj link do projektu</h3>
-    <label>NAZWA</label>
-    <input type="text" id="ln" placeholder="np. FluxPay">
-    <label>URL</label>
-    <input type="text" id="lu" placeholder="https://...">
+    <h3>➕ Dodaj projekt / link</h3>
+    <label>NAZWA *</label>
+    <input type="text" id="ln" placeholder="np. GM Deploy Bot">
+    <label>URL (opcjonalne — zostaw puste jeśli tylko VPS)</label>
+    <input type="text" id="lu" placeholder="https://... lub zostaw puste">
+    <label>EMOJI / IKONA (opcjonalne)</label>
+    <input type="text" id="li" placeholder="np. 🌅" maxlength="4">
     <label>KOLOR (hex, opcjonalnie)</label>
     <input type="text" id="lc" placeholder="#ffd740">
     <div class="mbtns">
@@ -539,6 +588,15 @@ async function loadAll() {
   // load other links
   const ld = await fbGet('settings', 'links');
   if (ld && ld.list) STATE.links = ld.list;
+  // load hidden defaults
+  const hd = await fbGet('settings', 'hiddenDefaults');
+  if (hd && hd.list) STATE.hiddenDefaults = hd.list;
+  // filter DEFAULTS in-place based on hiddenDefaults
+  if (STATE.hiddenDefaults && STATE.hiddenDefaults.length) {
+    for (let i = DEFAULTS.length - 1; i >= 0; i--) {
+      if (STATE.hiddenDefaults.includes(DEFAULTS[i].n)) DEFAULTS.splice(i, 1);
+    }
+  }
   // load global note
   const gd = await fbGet('settings', 'global');
   if (gd && gd.text !== undefined) STATE.global = gd.text;
@@ -591,49 +649,103 @@ function renderCmds(pid, cmds, el) {
   });
 }
 
+const DEFAULTS = [
+  {n:'OPForge',      url:'#',  c:'#ffd740', i:'🔨'},
+  {n:'PixelNFT',     url:'#',  c:'#ffd740', i:'🖼️'},
+  {n:'Happy Rabbits',url:'#',  c:'#ffd740', i:'🐰'},
+  {n:'FluxPay',      url:'#',  c:'#ffd740', i:'💸'},
+  {n:'KiiChain Quiz',url:'#',  c:'#b39ddb', i:'🧩'},
+  {n:'CryptoFeed',   url:'#',  c:'#00e5ff', i:'📰'},
+  {n:'X Article Builder',url:'#',c:'#00e5ff',i:'✍️'},
+  {n:'Gmail → Word', url:'#',  c:'#ff6b6b', i:'✉️'},
+  {n:'Sprawozdania', url:'#',  c:'#69ffb4', i:'📝'},
+];
+
 function renderLinks() {
-  const box = document.getElementById('other-chips'); box.innerHTML = '';
-  const defaults = [
-    {n:'OPForge',url:'#',c:'#ffd740'},{n:'PixelNFT',url:'#',c:'#ffd740'},
-    {n:'Happy Rabbits',url:'#',c:'#ffd740'},{n:'FluxPay',url:'#',c:'#ffd740'},
-    {n:'KiiChain Quiz',url:'#',c:'#b39ddb'},{n:'CryptoFeed',url:'#',c:'#00e5ff'},
-    {n:'X Article Builder',url:'#',c:'#00e5ff'},{n:'Gmail → Word',url:'#',c:'#ff6b6b'},
-    {n:'Sprawozdania',url:'#',c:'#69ffb4'},
-  ];
-  const all = [...defaults, ...STATE.links];
+  // ── right panel chips ──
+  const box = document.getElementById('other-chips');
+  box.innerHTML = '';
+  const all = [...DEFAULTS, ...STATE.links];
   all.forEach((lnk, i) => {
+    const isUser = i >= DEFAULTS.length;
     const chip = document.createElement('span');
     chip.className = 'chip-a';
     chip.style.borderColor = lnk.c || 'rgba(0,229,255,.3)';
-    chip.innerHTML = `<a href="${lnk.url}" target="_blank" style="color:#fff;text-decoration:none;">${esc(lnk.n)}</a>`;
-    if (i >= defaults.length) { // user-added = deletable
-      const del = document.createElement('button'); del.className = 'chip-del'; del.textContent = '✕';
-      del.onclick = () => {
-        STATE.links.splice(i - defaults.length, 1);
-        fbSet('settings', 'links', { list: STATE.links });
-        renderLinks(); toast('Usunięto link');
-      };
-      chip.appendChild(del);
-    }
+    const a = document.createElement('a');
+    a.href = lnk.url && lnk.url !== '#' ? lnk.url : '#';
+    a.target = '_blank';
+    a.style.cssText = 'color:#fff;text-decoration:none;';
+    a.textContent = (lnk.i ? lnk.i + ' ' : '') + lnk.n;
+    chip.appendChild(a);
+    const del = document.createElement('button');
+    del.className = 'chip-del'; del.textContent = '✕'; del.title = 'Usuń';
+    del.onclick = (e) => { e.stopPropagation(); removeLink(i, isUser); };
+    chip.appendChild(del);
     box.appendChild(chip);
   });
+
+  // ── links tab grid ──
+  const grid = document.getElementById('links-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  if (!all.length) {
+    grid.innerHTML = '<div class="links-empty">Brak linków — dodaj pierwszy ↗</div>';
+    return;
+  }
+  all.forEach((lnk, i) => {
+    const isUser = i >= DEFAULTS.length;
+    const card = document.createElement('div'); card.className = 'link-card';
+    const hasUrl = lnk.url && lnk.url !== '#';
+    card.innerHTML = `
+      <div class="link-card-left">
+        <div class="link-card-name">
+          <span class="link-card-dot" style="background:${lnk.c||'#00e5ff'}"></span>
+          ${lnk.i ? lnk.i + ' ' : ''}${esc(lnk.n)}
+        </div>
+        <div class="link-card-url">
+          ${hasUrl ? `<a href="${lnk.url}" target="_blank">${esc(lnk.url)}</a>` : '<span class="lc-novps">VPS only — brak URL</span>'}
+        </div>
+      </div>
+      <div class="link-card-actions">
+        ${hasUrl ? `<a href="${lnk.url}" target="_blank" class="lc-open">↗ OTWÓRZ</a>` : ''}
+        <button class="lc-del" title="Usuń">✕</button>
+      </div>`;
+    card.querySelector('.lc-del').onclick = () => removeLink(i, isUser);
+    grid.appendChild(card);
+  });
+}
+
+function removeLink(globalIdx, isUser) {
+  if (isUser) {
+    const userIdx = globalIdx - DEFAULTS.length;
+    STATE.links.splice(userIdx, 1);
+    fbSet('settings', 'links', { list: STATE.links });
+  } else {
+    // remove from defaults by hiding (store in settings.hiddenDefaults)
+    const key = DEFAULTS[globalIdx].n;
+    if (!STATE.hiddenDefaults) STATE.hiddenDefaults = [];
+    if (!STATE.hiddenDefaults.includes(key)) STATE.hiddenDefaults.push(key);
+    fbSet('settings', 'hiddenDefaults', { list: STATE.hiddenDefaults });
+  }
+  renderLinks();
+  toast('Usunięto link');
 }
 
 function buildViews() {
   const wrap = document.getElementById('views-wrap');
   const tabs = document.getElementById('tabs-bar');
   PROJECTS.forEach((proj, idx) => {
-    // tab
+    // tab (inserted before the static LINKI tab)
     const tab = document.createElement('button');
-    tab.className = 'tab-btn' + (idx === 0 ? ' active' : '');
+    tab.className = 'tab-btn';
     tab.dataset.pid = proj.id;
     tab.innerHTML = `<span class="ti">${proj.icon}</span>${proj.name}`;
     tab.onclick = () => switchTab(proj.id);
-    tabs.appendChild(tab);
+    tabs.insertBefore(tab, document.getElementById('tab-links'));
 
     // view
     const view = document.createElement('div');
-    view.className = 'pview' + (idx === 0 ? ' active' : '');
+    view.className = 'pview';
     view.id = 'pv-' + proj.id;
 
     // top bar
@@ -684,13 +796,17 @@ function buildViews() {
     split.appendChild(np);
 
     view.appendChild(split);
-    wrap.appendChild(view);
+    wrap.insertBefore(view, document.getElementById('pv-__links__'));
   });
+
+  // activate first project tab by default
+  switchTab(PROJECTS[0].id);
 }
 
 function switchTab(pid) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pid === pid));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pid === pid || (pid === '__links__' && b.id === 'tab-links')));
   document.querySelectorAll('.pview').forEach(v => v.classList.toggle('active', v.id === 'pv-' + pid));
+  document.querySelectorAll('.links-view').forEach(v => v.classList.toggle('active', pid === '__links__'));
 }
 
 /* ══════════════════════════════════
@@ -707,6 +823,7 @@ function openCmdModal(pid) {
 function openLinkModal() {
   document.getElementById('ln').value = '';
   document.getElementById('lu').value = '';
+  document.getElementById('li').value = '';
   document.getElementById('lc').value = '#ffd740';
   document.getElementById('modal-link').classList.add('open');
   setTimeout(() => document.getElementById('ln').focus(), 50);
@@ -726,9 +843,10 @@ function addCmd() {
 function addLink() {
   const n = document.getElementById('ln').value.trim();
   const u = document.getElementById('lu').value.trim();
+  const i = document.getElementById('li').value.trim();
   const c = document.getElementById('lc').value.trim() || '#ffd740';
-  if (!n || !u) { toast('⚠️ Wpisz nazwę i URL'); return; }
-  STATE.links.push({ n, url: u, c });
+  if (!n) { toast('⚠️ Wpisz nazwę projektu'); return; }
+  STATE.links.push({ n, url: u || '#', c, i });
   fbSet('settings', 'links', { list: STATE.links });
   renderLinks();
   closeModal('modal-link'); toast('✓ Dodano: ' + n);
