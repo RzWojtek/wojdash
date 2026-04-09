@@ -271,8 +271,10 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
 .lc-del{padding:4px 7px;border-radius:5px;font-size:11px;line-height:1;
   color:var(--red);border:1px solid rgba(255,107,107,.25);background:transparent;cursor:pointer;transition:all .15s;}
 .lc-del:hover{background:rgba(255,107,107,.12);}
-.lc-novps{padding:3px 8px;border-radius:4px;font-family:var(--mono);font-size:8px;
-  color:var(--yellow);border:1px solid rgba(255,215,64,.2);background:transparent;white-space:nowrap;}
+.link-card-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px;}
+.lc-edit{padding:4px 7px;border-radius:5px;font-size:12px;line-height:1;
+  border:1px solid rgba(255,255,255,.15);background:transparent;cursor:pointer;transition:all .15s;}
+.lc-edit:hover{background:rgba(255,255,255,.1);}
 .links-empty{font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px 4px;grid-column:1/-1;}
 .add-link-btn{padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;
   color:var(--neon);border:1px solid rgba(0,229,255,.3);background:transparent;cursor:pointer;transition:all .2s;}
@@ -443,18 +445,20 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
 <!-- ══ MODAL: LINK ══ -->
 <div class="ov" id="modal-link">
   <div class="modal">
-    <h3>➕ Dodaj projekt / link</h3>
+    <h3 id="lm-title">➕ Dodaj projekt / link</h3>
     <label>NAZWA *</label>
     <input type="text" id="ln" placeholder="np. GM Deploy Bot">
     <label>URL (opcjonalne — zostaw puste jeśli tylko VPS)</label>
     <input type="text" id="lu" placeholder="https://... lub zostaw puste">
+    <label>OPIS (opcjonalne)</label>
+    <input type="text" id="ld" placeholder="np. Codzienne GM na różnych sieciach">
     <label>EMOJI / IKONA (opcjonalne)</label>
     <input type="text" id="li" placeholder="np. 🌅" maxlength="4">
     <label>KOLOR (hex, opcjonalnie)</label>
     <input type="text" id="lc" placeholder="#ffd740">
     <div class="mbtns">
       <button class="mbt cx" onclick="closeModal('modal-link')">ANULUJ</button>
-      <button class="mbt ok" onclick="addLink()">DODAJ</button>
+      <button class="mbt ok" onclick="saveLinkModal()">ZAPISZ</button>
     </div>
   </div>
 </div>
@@ -551,12 +555,33 @@ const PROJECTS = [
 ];
 
 /* ══════════════════════════════════
+   DEFAULT LINKS — zapisywane do Firebase
+   przy pierwszym uruchomieniu, potem
+   zarządzane wyłącznie przez UI
+══════════════════════════════════ */
+const DEFAULT_LINKS = [
+  { id:'xpost',        n:'XPost Manager',       i:'📋', c:'#00e5ff', url:'https://xpost-manager.vercel.app', desc:'Posty X · TG Sygnały · TG Wpisy' },
+  { id:'signal',       n:'Signal Monitor (TG)', i:'📡', c:'#ff6b9d', url:'',                                 desc:'Telethon · monitoring kanałów TG' },
+  { id:'kurator',      n:'Aplikacja Kuratora',  i:'⚖️', c:'#69ffb4', url:'https://kurator.vercel.app',       desc:'Karty Czynności · Sprawozdania' },
+  { id:'tiktok',       n:'TikTok Monitor',      i:'🎵', c:'#ff6b6b', url:'',                                 desc:'yt-dlp · Whisper · transkrypcje' },
+  { id:'cryptotodo',   n:'CryptoToDo',          i:'✅', c:'#b39ddb', url:'https://cryptotodo.vercel.app',    desc:'Zadania i workflow krypto' },
+  { id:'xparaf',       n:'XParafBot',           i:'🤖', c:'#40c4ff', url:'https://xparafbot.vercel.app',     desc:'Bot krypto X · Groq AI' },
+  { id:'cryptoquests', n:'CryptoQuests',        i:'🎮', c:'#ffd740', url:'',                                 desc:'Gamified DeFi platform' },
+  { id:'opforge',      n:'OPForge',             i:'🔨', c:'#ffd740', url:'',                                 desc:'Token launcher OP_NET' },
+  { id:'pixelnft',     n:'PixelNFT',            i:'🖼️', c:'#ffd740', url:'',                                 desc:'Avatar gen · x402/USDC' },
+  { id:'rabbits',      n:'Happy Rabbits',       i:'🐰', c:'#ffd740', url:'',                                 desc:'NFT generator 3000 szt.' },
+  { id:'fluxpay',      n:'FluxPay',             i:'💸', c:'#ffd740', url:'',                                 desc:'DeFi app Arc Testnet' },
+  { id:'kiichainquiz', n:'KiiChain Quiz',       i:'🧩', c:'#b39ddb', url:'',                                 desc:'Quiz assistant workflow' },
+  { id:'cryptofeed',   n:'CryptoFeed',          i:'📰', c:'#00e5ff', url:'',                                 desc:'Agregator krypto newsów' },
+  { id:'xarticle',     n:'X Article Builder',   i:'✍️', c:'#00e5ff', url:'',                                 desc:'Prompt builder artykułów' },
+  { id:'gmailword',    n:'Gmail → Word',         i:'✉️', c:'#ff6b6b', url:'',                                 desc:'Karty z maili · Node.js' },
+  { id:'sprawozdania', n:'Sprawozdania',         i:'📝', c:'#69ffb4', url:'',                                 desc:'Generator sprawozdań HTML' },
+];
+
+/* ══════════════════════════════════
    FIREBASE HELPERS
 ══════════════════════════════════ */
 let saveTimer = {};
-function userDoc(path) {
-  return window._doc(window._db, 'users', window._uid, path.split('/')[0], path.split('/')[1] || path);
-}
 function userDocSimple(col, docId) {
   return window._doc(window._db, 'users', window._uid, col, docId);
 }
@@ -570,34 +595,27 @@ async function fbSet(col, docId, data) {
 }
 
 /* ══════════════════════════════════
-   STATE (in-memory cache)
+   STATE
 ══════════════════════════════════ */
 const STATE = { cmds:{}, notes:{}, links:[], global:'' };
 
 async function loadAll() {
-  // load custom commands per project
   for (const p of PROJECTS) {
     const d = await fbGet('cmds', p.id);
     if (d && d.list) STATE.cmds[p.id] = d.list;
   }
-  // load notes per project
   for (const p of PROJECTS) {
     const d = await fbGet('notes', p.id);
     if (d && d.text !== undefined) STATE.notes[p.id] = d.text;
   }
-  // load other links
+  // Linki: jeśli Firebase puste → zapisz domyślne
   const ld = await fbGet('settings', 'links');
-  if (ld && ld.list) STATE.links = ld.list;
-  // load hidden defaults
-  const hd = await fbGet('settings', 'hiddenDefaults');
-  if (hd && hd.list) STATE.hiddenDefaults = hd.list;
-  // filter DEFAULTS in-place based on hiddenDefaults
-  if (STATE.hiddenDefaults && STATE.hiddenDefaults.length) {
-    for (let i = DEFAULTS.length - 1; i >= 0; i--) {
-      if (STATE.hiddenDefaults.includes(DEFAULTS[i].n)) DEFAULTS.splice(i, 1);
-    }
+  if (ld && ld.list && ld.list.length > 0) {
+    STATE.links = ld.list;
+  } else {
+    STATE.links = DEFAULT_LINKS.map(l => ({...l}));
+    await fbSet('settings', 'links', { list: STATE.links });
   }
-  // load global note
   const gd = await fbGet('settings', 'global');
   if (gd && gd.text !== undefined) STATE.global = gd.text;
 
@@ -649,86 +667,71 @@ function renderCmds(pid, cmds, el) {
   });
 }
 
-const DEFAULTS = [
-  {n:'OPForge',      url:'#',  c:'#ffd740', i:'🔨'},
-  {n:'PixelNFT',     url:'#',  c:'#ffd740', i:'🖼️'},
-  {n:'Happy Rabbits',url:'#',  c:'#ffd740', i:'🐰'},
-  {n:'FluxPay',      url:'#',  c:'#ffd740', i:'💸'},
-  {n:'KiiChain Quiz',url:'#',  c:'#b39ddb', i:'🧩'},
-  {n:'CryptoFeed',   url:'#',  c:'#00e5ff', i:'📰'},
-  {n:'X Article Builder',url:'#',c:'#00e5ff',i:'✍️'},
-  {n:'Gmail → Word', url:'#',  c:'#ff6b6b', i:'✉️'},
-  {n:'Sprawozdania', url:'#',  c:'#69ffb4', i:'📝'},
-];
-
+/* ══════════════════════════════════
+   RENDER LINKS
+══════════════════════════════════ */
 function renderLinks() {
-  // ── right panel chips ──
+  // ── prawy panel: chipsy ──
   const box = document.getElementById('other-chips');
-  box.innerHTML = '';
-  const all = [...DEFAULTS, ...STATE.links];
-  all.forEach((lnk, i) => {
-    const isUser = i >= DEFAULTS.length;
-    const chip = document.createElement('span');
-    chip.className = 'chip-a';
-    chip.style.borderColor = lnk.c || 'rgba(0,229,255,.3)';
-    const a = document.createElement('a');
-    a.href = lnk.url && lnk.url !== '#' ? lnk.url : '#';
-    a.target = '_blank';
-    a.style.cssText = 'color:#fff;text-decoration:none;';
-    a.textContent = (lnk.i ? lnk.i + ' ' : '') + lnk.n;
-    chip.appendChild(a);
-    const del = document.createElement('button');
-    del.className = 'chip-del'; del.textContent = '✕'; del.title = 'Usuń';
-    del.onclick = (e) => { e.stopPropagation(); removeLink(i, isUser); };
-    chip.appendChild(del);
-    box.appendChild(chip);
-  });
+  if (box) {
+    box.innerHTML = '';
+    STATE.links.forEach((lnk, i) => {
+      const chip = document.createElement('span');
+      chip.className = 'chip-a';
+      chip.style.borderColor = lnk.c || 'rgba(0,229,255,.3)';
+      const a = document.createElement('a');
+      a.href = lnk.url || '#';
+      if (lnk.url) a.target = '_blank';
+      a.style.cssText = 'color:#fff;text-decoration:none;';
+      a.textContent = (lnk.i ? lnk.i + ' ' : '') + lnk.n;
+      chip.appendChild(a);
+      const del = document.createElement('button');
+      del.className = 'chip-del'; del.textContent = '✕'; del.title = 'Usuń';
+      del.onclick = (e) => { e.stopPropagation(); removeLink(i); };
+      chip.appendChild(del);
+      box.appendChild(chip);
+    });
+  }
 
-  // ── links tab grid ──
+  // ── zakładka Linki: karty ──
   const grid = document.getElementById('links-grid');
   if (!grid) return;
   grid.innerHTML = '';
-  if (!all.length) {
-    grid.innerHTML = '<div class="links-empty">Brak linków — dodaj pierwszy ↗</div>';
+  if (!STATE.links.length) {
+    grid.innerHTML = '<div class="links-empty">Brak projektów — dodaj pierwszy ↗</div>';
     return;
   }
-  all.forEach((lnk, i) => {
-    const isUser = i >= DEFAULTS.length;
+  STATE.links.forEach((lnk, i) => {
+    const hasUrl = lnk.url && lnk.url.length > 0;
     const card = document.createElement('div'); card.className = 'link-card';
-    const hasUrl = lnk.url && lnk.url !== '#';
     card.innerHTML = `
       <div class="link-card-left">
         <div class="link-card-name">
-          <span class="link-card-dot" style="background:${lnk.c||'#00e5ff'}"></span>
-          ${lnk.i ? lnk.i + ' ' : ''}${esc(lnk.n)}
+          <span class="link-card-dot" style="background:${lnk.c||'#00e5ff'};box-shadow:0 0 6px ${lnk.c||'#00e5ff'}40"></span>
+          <span>${lnk.i ? lnk.i + ' ' : ''}${esc(lnk.n)}</span>
         </div>
+        ${lnk.desc ? `<div class="link-card-sub">${esc(lnk.desc)}</div>` : ''}
         <div class="link-card-url">
-          ${hasUrl ? `<a href="${lnk.url}" target="_blank">${esc(lnk.url)}</a>` : '<span class="lc-novps">VPS only — brak URL</span>'}
+          ${hasUrl ? `<a href="${lnk.url}" target="_blank">${esc(lnk.url)}</a>`
+                   : '<span class="lc-novps">⚙️ VPS only — brak URL</span>'}
         </div>
       </div>
       <div class="link-card-actions">
-        ${hasUrl ? `<a href="${lnk.url}" target="_blank" class="lc-open">↗ OTWÓRZ</a>` : ''}
+        ${hasUrl ? `<a href="${lnk.url}" target="_blank" class="lc-open">↗</a>` : ''}
+        <button class="lc-edit" title="Edytuj">✏️</button>
         <button class="lc-del" title="Usuń">✕</button>
       </div>`;
-    card.querySelector('.lc-del').onclick = () => removeLink(i, isUser);
+    card.querySelector('.lc-edit').onclick = () => openEditLinkModal(i);
+    card.querySelector('.lc-del').onclick  = () => removeLink(i);
     grid.appendChild(card);
   });
 }
 
-function removeLink(globalIdx, isUser) {
-  if (isUser) {
-    const userIdx = globalIdx - DEFAULTS.length;
-    STATE.links.splice(userIdx, 1);
-    fbSet('settings', 'links', { list: STATE.links });
-  } else {
-    // remove from defaults by hiding (store in settings.hiddenDefaults)
-    const key = DEFAULTS[globalIdx].n;
-    if (!STATE.hiddenDefaults) STATE.hiddenDefaults = [];
-    if (!STATE.hiddenDefaults.includes(key)) STATE.hiddenDefaults.push(key);
-    fbSet('settings', 'hiddenDefaults', { list: STATE.hiddenDefaults });
-  }
-  renderLinks();
-  toast('Usunięto link');
+function removeLink(i) {
+  if (!confirm(`Usunąć "${STATE.links[i].n}"?`)) return;
+  STATE.links.splice(i, 1);
+  fbSet('settings', 'links', { list: STATE.links });
+  renderLinks(); toast('Usunięto projekt');
 }
 
 function buildViews() {
@@ -820,14 +823,56 @@ function openCmdModal(pid) {
   document.getElementById('modal-cmd').classList.add('open');
   setTimeout(() => document.getElementById('mn').focus(), 50);
 }
+/* ══════════════════════════════════
+   LINK MODAL — dodaj i edytuj
+══════════════════════════════════ */
+let editLinkIdx = null;
+
 function openLinkModal() {
+  editLinkIdx = null;
+  document.getElementById('lm-title').textContent = '➕ Dodaj projekt / link';
   document.getElementById('ln').value = '';
   document.getElementById('lu').value = '';
   document.getElementById('li').value = '';
   document.getElementById('lc').value = '#ffd740';
+  document.getElementById('ld').value = '';
   document.getElementById('modal-link').classList.add('open');
   setTimeout(() => document.getElementById('ln').focus(), 50);
 }
+
+function openEditLinkModal(i) {
+  editLinkIdx = i;
+  const lnk = STATE.links[i];
+  document.getElementById('lm-title').textContent = '✏️ Edytuj projekt';
+  document.getElementById('ln').value = lnk.n   || '';
+  document.getElementById('lu').value = lnk.url || '';
+  document.getElementById('li').value = lnk.i   || '';
+  document.getElementById('lc').value = lnk.c   || '#ffd740';
+  document.getElementById('ld').value = lnk.desc|| '';
+  document.getElementById('modal-link').classList.add('open');
+  setTimeout(() => document.getElementById('ln').focus(), 50);
+}
+
+function saveLinkModal() {
+  const n = document.getElementById('ln').value.trim();
+  const u = document.getElementById('lu').value.trim();
+  const i = document.getElementById('li').value.trim();
+  const c = document.getElementById('lc').value.trim() || '#ffd740';
+  const d = document.getElementById('ld').value.trim();
+  if (!n) { toast('⚠️ Wpisz nazwę projektu'); return; }
+  if (editLinkIdx !== null) {
+    STATE.links[editLinkIdx] = { ...STATE.links[editLinkIdx], n, url: u, i, c, desc: d };
+    toast('✓ Zaktualizowano: ' + n);
+  } else {
+    const id = n.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
+    STATE.links.push({ id, n, url: u, i, c, desc: d });
+    toast('✓ Dodano: ' + n);
+  }
+  fbSet('settings', 'links', { list: STATE.links });
+  renderLinks();
+  closeModal('modal-link');
+}
+
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 function addCmd() {
@@ -839,17 +884,6 @@ function addCmd() {
   fbSet('cmds', mPid, { list: a });
   renderCmds(mPid, a, document.getElementById('cs-' + mPid));
   closeModal('modal-cmd'); toast('✓ Dodano: ' + n);
-}
-function addLink() {
-  const n = document.getElementById('ln').value.trim();
-  const u = document.getElementById('lu').value.trim();
-  const i = document.getElementById('li').value.trim();
-  const c = document.getElementById('lc').value.trim() || '#ffd740';
-  if (!n) { toast('⚠️ Wpisz nazwę projektu'); return; }
-  STATE.links.push({ n, url: u || '#', c, i });
-  fbSet('settings', 'links', { list: STATE.links });
-  renderLinks();
-  closeModal('modal-link'); toast('✓ Dodano: ' + n);
 }
 
 document.querySelectorAll('.ov').forEach(ov => ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); }));
