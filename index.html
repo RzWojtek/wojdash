@@ -620,6 +620,7 @@ async function loadAll() {
   if (gd && gd.text !== undefined) STATE.global = gd.text;
 
   renderLinks();
+  refreshOpenButtons();
   const gnp = document.getElementById('gnp');
   gnp.value = STATE.global; upGc();
 }
@@ -664,6 +665,28 @@ function renderCmds(pid, cmds, el) {
       renderCmds(pid, a, el); toast('Usunięto komendę');
     };
     el.appendChild(row);
+  });
+}
+
+/* ══════════════════════════════════
+   SYNC — przycisk OTWÓRZ bierze URL z Firebase
+══════════════════════════════════ */
+function refreshOpenButtons() {
+  PROJECTS.forEach(proj => {
+    const btn = document.getElementById('open-btn-' + proj.id);
+    if (!btn) return;
+    // szukaj w STATE.links po id lub nazwie projektu
+    const lnk = STATE.links.find(l => l.id === proj.id || l.n === proj.name);
+    if (lnk && lnk.url) {
+      btn.href = lnk.url;
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+    } else {
+      btn.href = '#';
+      btn.style.opacity = '0.35';
+      btn.style.pointerEvents = 'none';
+      btn.title = 'Brak URL — ustaw go w zakładce Linki';
+    }
   });
 }
 
@@ -725,6 +748,8 @@ function renderLinks() {
     card.querySelector('.lc-del').onclick  = () => removeLink(i);
     grid.appendChild(card);
   });
+  // sync przyciski OTWÓRZ w zakładkach projektów
+  refreshOpenButtons();
 }
 
 function removeLink(i) {
@@ -761,7 +786,7 @@ function buildViews() {
           <div class="pv-desc">${proj.desc}</div>
         </div>
       </div>
-      <a href="${proj.url}" target="_blank" class="pv-open" style="border-color:${proj.color};color:${proj.color}">↗ OTWÓRZ</a>`;
+      <a href="${proj.url || '#'}" target="_blank" class="pv-open" id="open-btn-${proj.id}" style="border-color:${proj.color};color:${proj.color}">↗ OTWÓRZ</a>`;
     view.appendChild(top);
 
     // side-by-side split
