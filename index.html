@@ -18,12 +18,12 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot }
 //  🔧 KONFIGURACJA FIREBASE — wklej swoje dane
 // ═══════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey:            "AIzaSyAeTtdeqZM-V3zioFmdvZ2a49G54qeI4sw",
-  authDomain:        "wojdash-5f4c9.firebaseapp.com",
-  projectId:         "wojdash-5f4c9",
-  storageBucket:     "wojdash-5f4c9.firebasestorage.app",
-  messagingSenderId: "975323899690",
-  appId:             "1:975323899690:web:2aeb9c0a091f4292d06053"
+  apiKey:            "TWOJ_API_KEY",
+  authDomain:        "TWOJ_PROJECT.firebaseapp.com",
+  projectId:         "TWOJ_PROJECT_ID",
+  storageBucket:     "TWOJ_PROJECT.appspot.com",
+  messagingSenderId: "TWOJ_SENDER_ID",
+  appId:             "TWOJ_APP_ID"
 };
 
 const app  = initializeApp(firebaseConfig);
@@ -179,8 +179,31 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
   letter-spacing:1px;text-decoration:none;border:1px solid;transition:all .2s;white-space:nowrap;}
 .pv-open:hover{color:#111!important;background:currentColor;}
 
-/* side-by-side split */
-.pv-split{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;border-top:none;}
+/* side-by-side split: top row 2 cols, bottom notes full width */
+.pv-split{flex:1;min-height:0;display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr;}
+.pv-top-row{display:grid;grid-template-columns:1fr 1fr;min-height:0;border-bottom:1px solid var(--border);}
+
+/* SCRIPT PANEL */
+.script-panel{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);}
+.script-select-row{flex-shrink:0;padding:6px 10px;background:var(--bg);border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:6px;align-items:center;}
+.script-dropdown{flex:1;background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:6px;
+  color:#fff;font-family:var(--mono);font-size:10px;padding:5px 8px;outline:none;cursor:pointer;}
+.script-dropdown option{background:var(--card);}
+.script-dropdown:focus{border-color:var(--neon);}
+.script-del-sel{padding:4px 8px;border-radius:5px;font-size:10px;
+  color:var(--red);border:1px solid rgba(255,107,107,.2);background:transparent;cursor:pointer;transition:all .15s;}
+.script-del-sel:hover{background:rgba(255,107,107,.1);}
+.script-body{flex:1;min-height:0;overflow-y:auto;padding:10px 12px;}
+.script-body::-webkit-scrollbar{width:4px;}
+.script-body::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:2px;}
+.script-empty{font-family:var(--mono);font-size:10px;color:var(--muted);padding:8px 2px;}
+.script-name{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--neon);margin-bottom:8px;}
+.script-instructions{font-family:var(--mono);font-size:11px;color:#fff;line-height:1.8;
+  white-space:pre-wrap;word-break:break-word;}
+.script-copy-btn{margin-top:10px;padding:5px 14px;border-radius:6px;font-family:var(--mono);font-size:9px;
+  letter-spacing:1px;color:var(--neon);border:1px solid rgba(0,229,255,.35);background:transparent;
+  cursor:pointer;transition:all .2s;display:inline-block;}
+.script-copy-btn:hover{background:rgba(0,229,255,.12);}
 
 /* CMD PANEL */
 .cmd-panel{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--border);}
@@ -463,6 +486,21 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
   </div>
 </div>
 
+<!-- ══ MODAL: SKRYPT ══ -->
+<div class="ov" id="modal-script">
+  <div class="modal" style="width:540px;">
+    <h3>📜 Dodaj skrypt / instrukcję</h3>
+    <label>NAZWA SKRYPTU *</label>
+    <input type="text" id="sm-n" placeholder="np. Ręczne dodawanie pozycji">
+    <label>INSTRUKCJA / OPIS (może być wieloliniowy)</label>
+    <textarea id="sm-b" style="min-height:180px;" placeholder="cd /home/signal-bot&#10;python3 add_position.py&#10;&#10;Skrypt przeprowadzi Cię przez dodanie pozycji krok po kroku...&#10;Symbol: AGT&#10;Kierunek: SHORT&#10;..."></textarea>
+    <div class="mbtns">
+      <button class="mbt cx" onclick="closeModal('modal-script')">ANULUJ</button>
+      <button class="mbt ok" onclick="saveScript()">ZAPISZ SKRYPT</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -607,6 +645,12 @@ async function loadAll() {
   for (const p of PROJECTS) {
     const d = await fbGet('notes', p.id);
     if (d && d.text !== undefined) STATE.notes[p.id] = d.text;
+  }
+  // skrypty per projekt
+  STATE.scripts = {};
+  for (const p of PROJECTS) {
+    const d = await fbGet('scripts', p.id);
+    if (d && d.list) STATE.scripts[p.id] = d.list;
   }
   // Linki: jeśli Firebase puste → zapisz domyślne
   const ld = await fbGet('settings', 'links');
@@ -762,8 +806,8 @@ function removeLink(i) {
 function buildViews() {
   const wrap = document.getElementById('views-wrap');
   const tabs = document.getElementById('tabs-bar');
-  PROJECTS.forEach((proj, idx) => {
-    // tab (inserted before the static LINKI tab)
+  PROJECTS.forEach((proj) => {
+    // tab
     const tab = document.createElement('button');
     tab.className = 'tab-btn';
     tab.dataset.pid = proj.id;
@@ -771,12 +815,12 @@ function buildViews() {
     tab.onclick = () => switchTab(proj.id);
     tabs.insertBefore(tab, document.getElementById('tab-links'));
 
-    // view
+    // view container
     const view = document.createElement('div');
     view.className = 'pview';
     view.id = 'pv-' + proj.id;
 
-    // top bar
+    // ── top bar ──
     const top = document.createElement('div'); top.className = 'pv-top';
     top.innerHTML = `
       <div class="pv-title">
@@ -789,20 +833,46 @@ function buildViews() {
       <a href="${proj.url || '#'}" target="_blank" class="pv-open" id="open-btn-${proj.id}" style="border-color:${proj.color};color:${proj.color}">↗ OTWÓRZ</a>`;
     view.appendChild(top);
 
-    // side-by-side split
+    // ── main split ──
     const split = document.createElement('div'); split.className = 'pv-split';
 
-    // cmd panel
+    // ── top row: komendy + skrypty ──
+    const topRow = document.createElement('div'); topRow.className = 'pv-top-row';
+
+    // CMD panel
     const cp = document.createElement('div'); cp.className = 'cmd-panel';
     const cphdr = document.createElement('div'); cphdr.className = 'panel-hdr';
-    cphdr.innerHTML = `<span class="panel-hdr-l">⌨ KOMENDY VPS</span><button class="add-btn">+ DODAJ KOMENDĘ</button>`;
+    cphdr.innerHTML = `<span class="panel-hdr-l">⌨ KOMENDY VPS</span><button class="add-btn">+ DODAJ</button>`;
     cphdr.querySelector('.add-btn').onclick = () => openCmdModal(proj.id);
     const cs = document.createElement('div'); cs.className = 'cmd-scroll'; cs.id = 'cs-' + proj.id;
     renderCmds(proj.id, effCmds(proj.id), cs);
     cp.appendChild(cphdr); cp.appendChild(cs);
-    split.appendChild(cp);
+    topRow.appendChild(cp);
 
-    // note panel
+    // SCRIPT panel
+    const sp = document.createElement('div'); sp.className = 'script-panel';
+    const sphdr = document.createElement('div'); sphdr.className = 'panel-hdr';
+    sphdr.innerHTML = `<span class="panel-hdr-l">📜 SKRYPTY</span><button class="add-btn">+ DODAJ</button>`;
+    sphdr.querySelector('.add-btn').onclick = () => openScriptModal(proj.id);
+
+    // dropdown row
+    const selRow = document.createElement('div'); selRow.className = 'script-select-row';
+    const sel = document.createElement('select'); sel.className = 'script-dropdown'; sel.id = 'sd-' + proj.id;
+    sel.innerHTML = '<option value="">— wybierz skrypt —</option>';
+    const delSelBtn = document.createElement('button'); delSelBtn.className = 'script-del-sel'; delSelBtn.textContent = '✕'; delSelBtn.title = 'Usuń wybrany skrypt';
+    delSelBtn.onclick = () => deleteSelectedScript(proj.id);
+    selRow.appendChild(sel); selRow.appendChild(delSelBtn);
+
+    const sbody = document.createElement('div'); sbody.className = 'script-body'; sbody.id = 'sb-' + proj.id;
+    sbody.innerHTML = '<div class="script-empty">Wybierz skrypt z listy lub dodaj nowy ↗</div>';
+
+    sel.onchange = () => showScript(proj.id);
+
+    sp.appendChild(sphdr); sp.appendChild(selRow); sp.appendChild(sbody);
+    topRow.appendChild(sp);
+    split.appendChild(topRow);
+
+    // ── bottom: notatki (full width) ──
     const np = document.createElement('div'); np.className = 'note-panel';
     const nphdr = document.createElement('div'); nphdr.className = 'panel-hdr';
     nphdr.innerHTML = `<span class="panel-hdr-l">📝 NOTATKI</span><span class="note-status" id="ns-${proj.id}">Ctrl+S = zapisz</span>`;
@@ -827,7 +897,6 @@ function buildViews() {
     wrap.insertBefore(view, document.getElementById('pv-__links__'));
   });
 
-  // activate first project tab by default
   switchTab(PROJECTS[0].id);
 }
 
@@ -840,8 +909,87 @@ function switchTab(pid) {
 /* ══════════════════════════════════
    MODALS
 ══════════════════════════════════ */
-let mPid = null;
-function openCmdModal(pid) {
+/* ══════════════════════════════════
+   SKRYPTY
+══════════════════════════════════ */
+function effScripts(pid) {
+  return STATE.scripts && STATE.scripts[pid] ? STATE.scripts[pid] : [];
+}
+
+function refreshScriptDropdown(pid) {
+  const sel = document.getElementById('sd-' + pid);
+  if (!sel) return;
+  const scripts = effScripts(pid);
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— wybierz skrypt —</option>';
+  scripts.forEach((s, i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = s.n;
+    sel.appendChild(opt);
+  });
+  // przywróć zaznaczenie jeśli możliwe
+  if (prev !== '' && scripts[prev]) sel.value = prev;
+  showScript(pid);
+}
+
+function showScript(pid) {
+  const sel = document.getElementById('sd-' + pid);
+  const body = document.getElementById('sb-' + pid);
+  if (!sel || !body) return;
+  const scripts = effScripts(pid);
+  const idx = parseInt(sel.value);
+  if (isNaN(idx) || !scripts[idx]) {
+    body.innerHTML = '<div class="script-empty">Wybierz skrypt z listy lub dodaj nowy ↗</div>';
+    return;
+  }
+  const s = scripts[idx];
+  body.innerHTML = `
+    <div class="script-name">${esc(s.n)}</div>
+    <div class="script-instructions">${esc(s.body)}</div>
+    <button class="script-copy-btn" onclick="copyScript('${pid}',${idx})">📋 KOPIUJ INSTRUKCJĘ</button>`;
+}
+
+function copyScript(pid, idx) {
+  const s = effScripts(pid)[idx];
+  if (!s) return;
+  navigator.clipboard.writeText(s.body);
+  toast('✓ Skopiowano: ' + s.n);
+}
+
+function deleteSelectedScript(pid) {
+  const sel = document.getElementById('sd-' + pid);
+  const idx = parseInt(sel.value);
+  if (isNaN(idx)) { toast('⚠️ Najpierw wybierz skrypt'); return; }
+  const scripts = effScripts(pid);
+  if (!confirm(`Usunąć skrypt "${scripts[idx].n}"?`)) return;
+  scripts.splice(idx, 1);
+  if (!STATE.scripts) STATE.scripts = {};
+  STATE.scripts[pid] = scripts;
+  fbSet('scripts', pid, { list: scripts });
+  refreshScriptDropdown(pid);
+  toast('Usunięto skrypt');
+}
+
+let scriptPid = null;
+function openScriptModal(pid) {
+  scriptPid = pid;
+  document.getElementById('sm-n').value = '';
+  document.getElementById('sm-b').value = '';
+  document.getElementById('modal-script').classList.add('open');
+  setTimeout(() => document.getElementById('sm-n').focus(), 50);
+}
+function saveScript() {
+  const n = document.getElementById('sm-n').value.trim();
+  const b = document.getElementById('sm-b').value.trim();
+  if (!n) { toast('⚠️ Wpisz nazwę skryptu'); return; }
+  if (!STATE.scripts) STATE.scripts = {};
+  if (!STATE.scripts[scriptPid]) STATE.scripts[scriptPid] = [];
+  STATE.scripts[scriptPid].push({ n, body: b });
+  fbSet('scripts', scriptPid, { list: STATE.scripts[scriptPid] });
+  refreshScriptDropdown(scriptPid);
+  closeModal('modal-script');
+  toast('✓ Dodano skrypt: ' + n);
+}
   mPid = pid;
   document.getElementById('mn').value = '';
   document.getElementById('mc').value = '';
@@ -949,12 +1097,12 @@ function toast(msg) { const el = document.getElementById('toast'); el.textConten
 window.initApp = async function() {
   buildViews();
   await loadAll();
-  // refresh note textareas and cmd lists after load
   PROJECTS.forEach(p => {
     const ta = document.querySelector(`#pv-${p.id} .note-ta`);
     if (ta) ta.value = STATE.notes[p.id] || '';
     const cs = document.getElementById('cs-' + p.id);
     if (cs) renderCmds(p.id, effCmds(p.id), cs);
+    refreshScriptDropdown(p.id);
   });
 };
 </script>
