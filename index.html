@@ -990,6 +990,9 @@ function saveScript() {
   closeModal('modal-script');
   toast('✓ Dodano skrypt: ' + n);
 }
+
+let mPid = null;
+function openCmdModal(pid) {
   mPid = pid;
   document.getElementById('mn').value = '';
   document.getElementById('mc').value = '';
