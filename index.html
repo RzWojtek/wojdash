@@ -589,8 +589,16 @@ async function fbSet(col,docId,data){
 ══════════════════════════════════════ */
 async function loadAll(){
   const pd = await fbGet('settings','projects');
-  STATE.projects = (pd&&pd.list&&pd.list.length>0) ? pd.list : DEFAULT_PROJECTS.map(p=>({...p}));
-  if(!pd||!pd.list||!pd.list.length) await fbSet('settings','projects',{list:STATE.projects});
+  if(pd&&pd.list&&pd.list.length>0){
+    // uzupełnij brakujące domyślne projekty (np. VPS Monitor dodany później)
+    const existing=new Set(pd.list.map(p=>p.id));
+    const missing=DEFAULT_PROJECTS.filter(p=>!existing.has(p.id));
+    STATE.projects=[...pd.list,...missing];
+    if(missing.length) await fbSet('settings','projects',{list:STATE.projects});
+  } else {
+    STATE.projects=DEFAULT_PROJECTS.map(p=>({...p}));
+    await fbSet('settings','projects',{list:STATE.projects});
+  }
 
   const ld = await fbGet('settings','links');
   STATE.links = (ld&&ld.list&&ld.list.length>0) ? ld.list : DEFAULT_LINKS.map(l=>({...l}));
@@ -691,20 +699,26 @@ async function renderStats(proj){
   // ── TikTok Monitor ─────────────────────
   } else if(proj.id==='tiktok' && window._tiktokDb){
     area.innerHTML=`<div class="stats-row">
-      <div class="stat-box"><div class="stat-val loading" id="tt-active" style="color:#fff">…</div><div class="stat-label">Aktywnych</div></div>
+      <div class="stat-box"><div class="stat-val loading" id="tt-active" style="color:#fff">…</div><div class="stat-label">Transkrypcji aktywnych</div></div>
       <div class="stat-box"><div class="stat-val loading" id="tt-new" style="color:var(--neon)">…</div><div class="stat-label">Nowych</div></div>
       <div class="stat-box"><div class="stat-val loading" id="tt-ready" style="color:var(--yellow)">…</div><div class="stat-label">Gotowych</div></div>
       <div class="stat-box"><div class="stat-val loading" id="tt-pub" style="color:var(--green)">…</div><div class="stat-label">Opublikowanych</div></div>
+      <div class="stat-box"><div class="stat-val loading" id="tt-prompts" style="color:var(--purple)">…</div><div class="stat-label">Promptów aktywnych</div></div>
     </div>`;
     try{
-      // transkrypcje z kolekcji 'transkrypcje'
-      const snap=await window._getDocs(window._collection(window._tiktokDb,'transkrypcje'));
-      const all=snap.docs.map(d=>d.data());
+      const [tSnap, pSnap] = await Promise.all([
+        window._getDocs(window._collection(window._tiktokDb,'transkrypcje')),
+        window._getDocs(window._collection(window._tiktokDb,'prompty')),
+      ]);
+      const all=tSnap.docs.map(d=>d.data());
+      const prompts=pSnap.docs.map(d=>d.data());
       const active=all.filter(i=>i.status!=='Odrzucony'&&i.status!=='Opublikowany');
+      const promptsActive=prompts.filter(i=>i.status!=='Odrzucony'&&i.status!=='Opublikowany');
       document.getElementById('tt-active').textContent=active.length;
       document.getElementById('tt-new').textContent=active.filter(i=>i.status==='Nowy').length;
       document.getElementById('tt-ready').textContent=active.filter(i=>i.status==='Gotowy').length;
       document.getElementById('tt-pub').textContent=all.filter(i=>i.status==='Opublikowany').length;
+      document.getElementById('tt-prompts').textContent=promptsActive.length;
       area.querySelectorAll('.stat-val').forEach(v=>v.classList.remove('loading'));
     }catch(e){ area.innerHTML=`<div class="stats-none">⚠️ Błąd TikTok Firebase: ${e.message}</div>`; }
 
@@ -761,40 +775,46 @@ async function renderStats(proj){
   } else if(proj.id==='cryptotodo' && window._cryptoDb){
     area.innerHTML=`<div id="crypto-tasks-area"><div class="stats-none">⏳ Ładowanie zadań...</div></div>`;
     try{
-      // Zadania z users/{uid}/tasks
-      // CryptoToDo używa własnego Auth — pobieramy bez filtra po uid
-      // (zakładając że to jedyne konto lub dane są publiczne w tej kolekcji)
-      // Próbujemy najpierw z UID dashboardu, potem bez
-      let tasksSnap;
-      try{
-        tasksSnap=await window._getDocs(
-          window._query(window._collection(window._cryptoDb,'users',window._uid,'tasks'),window._orderBy('createdAt'))
-        );
-      } catch(e2){
-        tasksSnap=null;
-      }
+      const tasksSnap=await window._getDocs(
+        window._query(window._collection(window._cryptoDb,'users',window._uid,'tasks'),window._orderBy('createdAt'))
+      );
       const tasksArea=document.getElementById('crypto-tasks-area');
       if(!tasksSnap||tasksSnap.empty){
-        tasksArea.innerHTML='<div class="stats-none">📋 Zaloguj się w CryptoToDo tym samym kontem Google — dane będą widoczne</div>';
+        tasksArea.innerHTML='<div class="stats-none">📋 Zaloguj się w CryptoToDo tym samym kontem Google — dane będą widoczne tutaj</div>';
       } else {
-        const tasks=tasksSnap.docs.map(d=>d.data());
+        const tasks=tasksSnap.docs.map(d=>({id:d.id,...d.data()}));
+        // taskDone trzymane w localStorage CryptoToDo (per uid)
         const todayStr=new Date().toISOString().split('T')[0];
-        tasksArea.innerHTML=`<div style="overflow-y:auto;max-height:130px;border-bottom:1px solid var(--border);">
-          ${tasks.length===0?'<div class="stats-none">Brak zadań daily</div>':
-          tasks.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;
-            border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono);font-size:11px;">
-            <span style="font-size:14px">${t.done?'✅':'⬜'}</span>
-            <span style="color:${t.done?'var(--muted)':'#fff'};${t.done?'text-decoration:line-through':''}">${esc(t.text||t.name||'')}</span>
-          </div>`).join('')}
-        </div>`;
+        let taskDone={};
+        try{ taskDone=JSON.parse(localStorage.getItem('taskdone_'+window._uid)||'{}'); }catch(e2){}
+        const isDone=id=>taskDone[id]===todayStr;
+        const doneCount=tasks.filter(t=>isDone(t.id)).length;
+        const pct=tasks.length?Math.round(doneCount/tasks.length*100):0;
+        tasksArea.innerHTML=`
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);">
+            <span>Dziś: <strong style="color:${pct===100?'var(--green)':'#fff'}">${doneCount}/${tasks.length}</strong></span>
+            <div style="flex:1;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':'var(--neon)'};border-radius:2px;transition:width .5s;"></div>
+            </div>
+            <span style="color:${pct===100?'var(--green)':'var(--muted)'};">${pct}%</span>
+          </div>
+          <div style="overflow-y:auto;max-height:116px;">
+            ${tasks.map(t=>{
+              const done=isDone(t.id);
+              return `<div style="display:flex;align-items:center;gap:10px;padding:6px 16px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono);font-size:11px;">
+                <span style="font-size:13px;flex-shrink:0">${done?'✅':'⬜'}</span>
+                <span style="color:${done?'var(--muted)':'#fff'};${done?'text-decoration:line-through':''};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.text||t.name||'')}</span>
+              </div>`;
+            }).join('')}
+          </div>`;
       }
-    }catch(e){ document.getElementById('crypto-tasks-area').innerHTML=`<div class="stats-none">⚠️ Błąd CryptoToDo Firebase: ${e.message}</div>`; }
+    }catch(e){ document.getElementById('crypto-tasks-area').innerHTML=`<div class="stats-none">⚠️ Błąd CryptoToDo: ${e.message}</div>`; }
 
   // ── Aplikacja Kuratora — Terminy ────────
   } else if(proj.id==='kurator' && window._kuratorDb){
     area.innerHTML=`<div class="kurator-table" id="kurator-terms"><div class="stats-none">⏳ Ładowanie terminów...</div></div>`;
     try{
-      // Pobierz listę osób
+      // Ścieżka z Kalendarz.jsx: users/{uid}/persons/{personId}/kal_settings/config
       const personsSnap=await window._getDocs(
         window._collection(window._kuratorDb,'users',window._uid,'persons')
       );
@@ -802,31 +822,38 @@ async function renderStats(proj){
       const today=new Date().toISOString().split('T')[0];
       const results=[];
       for(const person of persons){
-        // Pobierz ustawienia kalendarza
-        const cfgSnap=await window._getDocs(
-          window._collection(window._kuratorDb,'users',window._uid,'persons',person.id,'kal_settings')
-        );
-        const cfg=cfgSnap.docs.find(d=>d.id==='config')?.data();
-        if(!cfg||!cfg.startDate||!cfg.freq) continue;
-        // Pobierz historię oddanych
-        const histSnap=await window._getDocs(
-          window._collection(window._kuratorDb,'users',window._uid,'persons',person.id,'kal_historia')
-        );
-        const hist=histSnap.docs.map(d=>d.data());
-        // Wygeneruj daty
-        const dates=generateDates(cfg.startDate,cfg.freq);
-        const effectiveDate=getEffectiveDate(dates,hist,today);
-        if(effectiveDate){
-          const days=Math.round((new Date(effectiveDate)-new Date(today))/86400000);
-          results.push({name:person.name||person.id,date:effectiveDate,days});
-        }
+        try{
+          // kal_settings/config
+          const cfgSnap=await window._getDocs(
+            window._collection(window._kuratorDb,'users',window._uid,'persons',person.id,'kal_settings')
+          );
+          const cfgDoc=cfgSnap.docs.find(d=>d.id==='config');
+          if(!cfgDoc) continue;
+          const cfg=cfgDoc.data();
+          if(!cfg.startDate||!cfg.freq) continue;
+          // kal_historia
+          const histSnap=await window._getDocs(
+            window._collection(window._kuratorDb,'users',window._uid,'persons',person.id,'kal_historia')
+          );
+          const hist=histSnap.docs.map(d=>d.data());
+          // wylicz następny efektywny termin (identycznie jak Kalendarz.jsx)
+          const dates=generateDates(cfg.startDate,cfg.freq);
+          const effectiveDate=getEffectiveDate(dates,hist,today);
+          if(effectiveDate){
+            const days=Math.round((new Date(effectiveDate)-new Date(today))/86400000);
+            results.push({name:person.name||person.nazwisko||person.id,date:effectiveDate,days});
+          }
+        }catch(e2){ /* pomiń osobę z błędem */ }
       }
       results.sort((a,b)=>a.days-b.days);
       const box=document.getElementById('kurator-terms');
-      if(!results.length){ box.innerHTML='<div class="stats-none">Brak skonfigurowanych terminów</div>'; return; }
+      if(!results.length){
+        box.innerHTML='<div class="stats-none">Brak skonfigurowanych terminów — dodaj je w Aplikacji Kuratora → Kalendarz</div>';
+        return;
+      }
       box.innerHTML=results.map(r=>{
         const cls=r.days<0?'over':r.days<=14?'warn':'ok';
-        const label=r.days<0?`${Math.abs(r.days)} dni po terminie`:r.days===0?'DZIŚ!':r.days===1?'jutro':`za ${r.days} dni`;
+        const label=r.days<0?`${Math.abs(r.days)} dni PO TERMINIE`:r.days===0?'⚠️ DZIŚ!':r.days===1?'jutro':`za ${r.days} dni`;
         return `<div class="kurator-row">
           <span class="kurator-name">${esc(r.name)}</span>
           <span class="kurator-date">${r.date}</span>
