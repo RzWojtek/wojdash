@@ -20,12 +20,12 @@ import { getFirestore as getFirestore2 } from "https://www.gstatic.com/firebasej
 //  🔧 KONFIGURACJA FIREBASE — DASHBOARD (wojdash)
 // ═══════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey: "AIzaSyAeTtdeqZM-V3zioFmdvZ2a49G54qeI4sw",
-  authDomain: "wojdash-5f4c9.firebaseapp.com",
-  projectId: "wojdash-5f4c9",
-  storageBucket: "wojdash-5f4c9.firebasestorage.app",
-  messagingSenderId: "975323899690",
-  appId: "1:975323899690:web:2aeb9c0a091f4292d06053"
+  apiKey:            "TWOJ_API_KEY",
+  authDomain:        "TWOJ_PROJECT.firebaseapp.com",
+  projectId:         "TWOJ_PROJECT_ID",
+  storageBucket:     "TWOJ_PROJECT.appspot.com",
+  messagingSenderId: "TWOJ_SENDER_ID",
+  appId:             "TWOJ_APP_ID"
 };
 
 // ═══════════════════════════════════════════════
@@ -33,12 +33,12 @@ const firebaseConfig = {
 //     (wklej dane z Firebase projektu XPost)
 // ═══════════════════════════════════════════════
 const xpostFirebaseConfig = {
-  apiKey: "AIzaSyCZWF2AVCYuv-_XYNK7dU0yd1uEn5Rs9IU",
-  authDomain: "xpost-manager-e481d.firebaseapp.com",
-  projectId: "xpost-manager-e481d",
-  storageBucket: "xpost-manager-e481d.firebasestorage.app",
-  messagingSenderId: "686782658357",
-  appId: "1:686782658357:web:18d93f706ff37201fb3e7c"
+  apiKey:            "XPOST_API_KEY",
+  authDomain:        "XPOST_PROJECT.firebaseapp.com",
+  projectId:         "XPOST_PROJECT_ID",
+  storageBucket:     "XPOST_PROJECT.appspot.com",
+  messagingSenderId: "XPOST_SENDER_ID",
+  appId:             "XPOST_APP_ID"
 };
 
 const app   = initializeApp(firebaseConfig);
@@ -824,29 +824,38 @@ async function renderStats(proj) {
   area.innerHTML = '';
 
   if (proj.id === 'xpost' && window._xpostDb) {
-    // XPost Manager — czyta z osobnego Firebase
+    // XPost Manager — dokładna logika z main.js linia 415-419:
+    // s-all  = wszystkie BEZ Odrzucone i BEZ Opublikowane
+    // s-new  = status === 'Nowy'
+    // s-todo = status === 'Do zrobienia' LUB 'W toku'
+    // s-done = status === 'Opublikowane'
+    // s-rt   = nie Odrzucone, nie Opublikowane, i isRT===true
     area.innerHTML = `
       <div class="stats-row">
-        <div class="stat-box loading"><div class="stat-val" id="s-all" style="color:#fff">…</div><div class="stat-label">Wszystkich</div></div>
-        <div class="stat-box loading"><div class="stat-val" id="s-new" style="color:var(--neon)">…</div><div class="stat-label">Nowych</div></div>
-        <div class="stat-box loading"><div class="stat-val" id="s-wip" style="color:var(--yellow)">…</div><div class="stat-label">W toku</div></div>
-        <div class="stat-box loading"><div class="stat-val" id="s-pub" style="color:var(--green)">…</div><div class="stat-label">Opublikowanych</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-all" style="color:#fff">…</div><div class="stat-label">Wszystkich</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-new" style="color:var(--neon)">…</div><div class="stat-label">Nowych</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-todo" style="color:#a78bfa">…</div><div class="stat-label">W toku</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-done" style="color:var(--green)">…</div><div class="stat-label">Opublikowanych</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-rt" style="color:var(--purple)">…</div><div class="stat-label">Retweetów</div></div>
       </div>`;
     try {
       const col = window._collection(window._xpostDb, 'posts');
-      const [all, nowe, wtoku, opubl] = await Promise.all([
-        window._getCountFromServer(col),
-        window._getCountFromServer(window._query(col, window._where('status','==','Nowe'))),
-        window._getCountFromServer(window._query(col, window._where('status','==','W toku'))),
-        window._getCountFromServer(window._query(col, window._where('status','==','Opublikowane'))),
-      ]);
-      document.getElementById('s-all').textContent = all.data().count;
-      document.getElementById('s-new').textContent = nowe.data().count;
-      document.getElementById('s-wip').textContent = wtoku.data().count;
-      document.getElementById('s-pub').textContent = opubl.data().count;
-      area.querySelectorAll('.stat-box').forEach(b => b.classList.remove('loading'));
+      // pobieramy wszystkie dokumenty — getCountFromServer nie obsługuje złożonych warunków
+      const snap = await window._getDocs(col);
+      const all = snap.docs.map(d => d.data());
+      const isRT = p => p.isRT || (p.account && p.account.includes(' RT @'));
+      const active   = all.filter(p => p.status !== 'Odrzucone' && p.status !== 'Opublikowane');
+      const nowe     = all.filter(p => p.status === 'Nowy');
+      const wtoku    = all.filter(p => p.status === 'Do zrobienia' || p.status === 'W toku');
+      const opubl    = all.filter(p => p.status === 'Opublikowane');
+      const rts      = all.filter(p => p.status !== 'Odrzucone' && p.status !== 'Opublikowane' && isRT(p));
+      document.getElementById('s-all').textContent  = active.length;
+      document.getElementById('s-new').textContent  = nowe.length;
+      document.getElementById('s-todo').textContent = wtoku.length;
+      document.getElementById('s-done').textContent = opubl.length;
+      document.getElementById('s-rt').textContent   = rts.length;
     } catch(e) {
-      area.innerHTML = `<div class="stats-none">⚠️ Błąd pobierania statystyk — sprawdź konfigurację Firebase XPost</div>`;
+      area.innerHTML = `<div class="stats-none">⚠️ Błąd pobierania statystyk: ${e.message}</div>`;
       console.error('XPost stats error:', e);
     }
   } else if (proj.statsConfig) {
