@@ -11,37 +11,56 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot }
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, getCountFromServer, initializeFirestore }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeApp as initApp2 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore as getFirestore2 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ═══════════════════════════════════════════════
-//  🔧 KONFIGURACJA FIREBASE — wklej swoje dane
+//  🔧 KONFIGURACJA FIREBASE — DASHBOARD (wojdash)
 // ═══════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey:            "AIzaSyAeTtdeqZM-V3zioFmdvZ2a49G54qeI4sw",
-  authDomain:        "wojdash-5f4c9.firebaseapp.com",
-  projectId:         "wojdash-5f4c9",
-  storageBucket:     "wojdash-5f4c9.firebasestorage.app",
-  messagingSenderId: "975323899690",
-  appId:             "1:975323899690:web:2aeb9c0a091f4292d06053"
+  apiKey:            "TWOJ_API_KEY",
+  authDomain:        "TWOJ_PROJECT.firebaseapp.com",
+  projectId:         "TWOJ_PROJECT_ID",
+  storageBucket:     "TWOJ_PROJECT.appspot.com",
+  messagingSenderId: "TWOJ_SENDER_ID",
+  appId:             "TWOJ_APP_ID"
 };
 
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db   = getFirestore(app);
+// ═══════════════════════════════════════════════
+//  🔧 KONFIGURACJA FIREBASE — XPOST MANAGER
+//     (wklej dane z Firebase projektu XPost)
+// ═══════════════════════════════════════════════
+const xpostFirebaseConfig = {
+  apiKey:            "XPOST_API_KEY",
+  authDomain:        "XPOST_PROJECT.firebaseapp.com",
+  projectId:         "XPOST_PROJECT_ID",
+  storageBucket:     "XPOST_PROJECT.appspot.com",
+  messagingSenderId: "XPOST_SENDER_ID",
+  appId:             "XPOST_APP_ID"
+};
 
-// ─── expose to window for non-module JS ───
-window._auth = auth;
-window._db   = db;
+const app   = initializeApp(firebaseConfig);
+const auth  = getAuth(app);
+const db    = getFirestore(app);
+
+// XPost Manager — osobna instancja Firebase
+let xpostDb = null;
+try {
+  const xpostApp = initApp2(xpostFirebaseConfig, 'xpost');
+  xpostDb = getFirestore2(xpostApp);
+} catch(e) { console.warn('XPost Firebase not configured:', e.message); }
+
+window._auth = auth; window._db = db; window._xpostDb = xpostDb;
 window._GoogleAuthProvider = GoogleAuthProvider;
-window._signInWithPopup    = signInWithPopup;
-window._signOut            = signOut;
-window._doc    = doc;
-window._getDoc = getDoc;
-window._setDoc = setDoc;
-window._onSnapshot = onSnapshot;
+window._signInWithPopup = signInWithPopup;
+window._signOut = signOut;
+window._doc = doc; window._getDoc = getDoc; window._setDoc = setDoc;
+window._collection = collection; window._getDocs = getDocs;
+window._query = query; window._where = where;
+window._getCountFromServer = getCountFromServer;
 
-// ─── Auth state watcher ───
 onAuthStateChanged(auth, user => {
   if (user) {
     window._uid = user.uid;
@@ -61,70 +80,46 @@ onAuthStateChanged(auth, user => {
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --bg:       #484862;
-  --surface:  #3e3e58;
-  --card:     #3a3a54;
-  --card2:    #424260;
-  --panel:    #404058;
-  --neon:     #00e5ff;
-  --neon-dim: rgba(0,229,255,0.15);
-  --purple:   #b39ddb;
-  --red:      #ff6b6b;
-  --green:    #69ffb4;
-  --yellow:   #ffd740;
-  --pink:     #ff6b9d;
-  --blue:     #40c4ff;
-  --text:     #ffffff;
-  --text2:    #e0e0f8;
-  --muted:    #a0a0c0;
-  --border:   rgba(0,229,255,0.18);
-  --mono:     'Share Tech Mono',monospace;
-  --ui:       'Exo 2',sans-serif;
+  --bg:#484862; --surface:#3e3e58; --card:#3a3a54; --card2:#424260;
+  --panel:#404058; --panel2:#383850;
+  --neon:#00e5ff; --purple:#b39ddb; --red:#ff6b6b;
+  --green:#69ffb4; --yellow:#ffd740; --pink:#ff6b9d; --blue:#40c4ff;
+  --text:#ffffff; --text2:#d0d0f0; --muted:#9090b8; --border:rgba(0,229,255,0.15);
+  --mono:'Share Tech Mono',monospace; --ui:'Exo 2',sans-serif;
 }
 html,body{height:100%;overflow:hidden;}
 body{font-family:var(--ui);background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
-
-/* ── GRID BG ── */
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background-image:linear-gradient(rgba(0,229,255,.04) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(0,229,255,.04) 1px,transparent 1px);
+  background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);
   background-size:44px 44px;}
 
-/* ══════════ LOGIN SCREEN ══════════ */
-#login-screen{
-  position:fixed;inset:0;z-index:999;
-  background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;
-}
-.login-logo{display:flex;align-items:center;gap:14px;}
-.login-icon{width:56px;height:56px;border-radius:14px;
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;z-index:999;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;}
+.login-icon{width:60px;height:60px;border-radius:14px;
   background:linear-gradient(135deg,var(--neon),var(--purple));
-  display:flex;align-items:center;justify-content:center;font-size:28px;
+  display:flex;align-items:center;justify-content:center;font-size:30px;
   box-shadow:0 0 30px rgba(0,229,255,.5);}
-.login-logo h1{font-size:26px;font-weight:800;letter-spacing:4px;text-transform:uppercase;
+.login-logo{display:flex;align-items:center;gap:14px;}
+.login-logo h1{font-size:28px;font-weight:800;letter-spacing:4px;text-transform:uppercase;
   background:linear-gradient(90deg,var(--neon),var(--purple));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .login-sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:3px;}
-.login-btn{
-  display:flex;align-items:center;gap:12px;
-  padding:14px 28px;border-radius:12px;
-  background:var(--card2);border:1px solid var(--border);
-  color:var(--text);font-family:var(--ui);font-size:14px;font-weight:600;
-  cursor:pointer;transition:all .25s;
-  box-shadow:0 4px 20px rgba(0,0,0,.3);
-}
-.login-btn:hover{border-color:var(--neon);box-shadow:0 4px 30px rgba(0,229,255,.25);transform:translateY(-2px);}
+.login-btn{display:flex;align-items:center;gap:12px;padding:14px 28px;border-radius:12px;
+  background:var(--card2);border:1px solid var(--border);color:var(--text);
+  font-family:var(--ui);font-size:14px;font-weight:600;cursor:pointer;transition:all .25s;}
+.login-btn:hover{border-color:var(--neon);box-shadow:0 0 30px rgba(0,229,255,.2);transform:translateY(-2px);}
 .login-btn img{width:22px;height:22px;}
 
-/* ══════════ APP ══════════ */
+/* ── APP SHELL ── */
 #app{display:none;flex-direction:column;height:100vh;position:relative;z-index:1;}
 
-/* HEADER */
+/* ── HEADER ── */
 header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content:space-between;
-  padding:0 18px;background:rgba(58,58,84,.97);border-bottom:1px solid var(--border);
-  backdrop-filter:blur(12px);}
+  padding:0 20px;background:rgba(58,58,84,.97);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);}
 .logo{display:flex;align-items:center;gap:10px;}
-.logo-icon{width:30px;height:30px;border-radius:7px;flex-shrink:0;
+.logo-icon{width:30px;height:30px;border-radius:7px;
   background:linear-gradient(135deg,var(--neon),var(--purple));
   display:flex;align-items:center;justify-content:center;font-size:15px;
   box-shadow:0 0 14px rgba(0,229,255,.4);animation:glow 3s ease-in-out infinite;}
@@ -136,8 +131,7 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
 .hdr-r{display:flex;align-items:center;gap:14px;}
 #clock{font-family:var(--mono);font-size:14px;color:var(--neon);}
 #dstr{font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:1px;}
-.pdot{width:5px;height:5px;border-radius:50%;background:var(--green);
-  box-shadow:0 0 6px var(--green);animation:blink 2s infinite;flex-shrink:0;}
+.pdot{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 2s infinite;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
 .user-info{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px;
   border-radius:8px;border:1px solid rgba(255,255,255,.1);transition:all .2s;}
@@ -145,208 +139,259 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
 #user-avatar{width:22px;height:22px;border-radius:50%;object-fit:cover;}
 #user-name{font-family:var(--mono);font-size:10px;color:var(--text2);}
 .logout-btn{font-family:var(--mono);font-size:9px;color:var(--muted);
-  background:transparent;border:none;cursor:pointer;padding:0 4px;transition:color .2s;}
+  background:transparent;border:none;cursor:pointer;transition:color .2s;}
 .logout-btn:hover{color:var(--red);}
 
-/* TABS */
-.tabs-bar{flex-shrink:0;display:flex;align-items:stretch;gap:1px;
+/* ── TABS ── */
+.tabs-bar{flex-shrink:0;display:flex;align-items:stretch;
   padding:0 14px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;}
 .tabs-bar::-webkit-scrollbar{height:2px;}
 .tabs-bar::-webkit-scrollbar-thumb{background:var(--neon);border-radius:2px;}
-.tab-btn{flex-shrink:0;padding:0 13px;height:40px;display:flex;align-items:center;gap:6px;
+.tab-btn{flex-shrink:0;padding:0 16px;height:40px;display:flex;align-items:center;gap:6px;
   font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
-  color:#ffffff;background:transparent;border:none;border-bottom:2px solid transparent;
-  cursor:pointer;transition:color .2s,border-color .2s;white-space:nowrap;opacity:.65;}
+  color:#fff;background:transparent;border:none;border-bottom:2px solid transparent;
+  cursor:pointer;transition:all .2s;white-space:nowrap;opacity:.6;}
 .tab-btn:hover{opacity:.9;}
-.tab-btn.active{color:#ffffff;border-bottom-color:var(--neon);opacity:1;}
-.tab-btn .ti{font-size:13px;}
+.tab-btn.active{opacity:1;border-bottom-color:var(--neon);color:#fff;}
+.tab-btn .ti{font-size:14px;}
 
-/* BODY */
-.body-area{flex:1;min-height:0;display:grid;grid-template-columns:1fr 350px;}
+/* ── BODY ── */
+.body-area{flex:1;min-height:0;display:flex;overflow:hidden;}
 
-/* PROJECT VIEW */
-.pview{display:none;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);}
-.pview.active{display:flex;}
+/* ── TAB VIEWS ── */
+.tab-view{display:none;flex:1;min-width:0;overflow:hidden;}
+.tab-view.active{display:flex;}
 
-/* project top */
-.pv-top{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
-  padding:10px 16px 8px;border-bottom:1px solid var(--border);background:var(--panel);}
-.pv-title{display:flex;align-items:center;gap:9px;}
-.pv-icon{font-size:20px;}
-.pv-name{font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#fff;}
-.pv-desc{font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:2px;}
-.pv-open{padding:6px 14px;border-radius:8px;font-family:var(--mono);font-size:9px;font-weight:700;
-  letter-spacing:1px;text-decoration:none;border:1px solid;transition:all .2s;white-space:nowrap;}
-.pv-open:hover{color:#111!important;background:currentColor;}
+/* ══════════════════════════════
+   HOME — kafelki projektów
+══════════════════════════════ */
+.home-view{flex-direction:column;overflow:hidden;}
+.home-inner{flex:1;min-height:0;display:flex;overflow:hidden;}
 
-/* side-by-side split: top row 2 cols, bottom notes full width */
-.pv-split{flex:1;min-height:0;display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr;}
-.pv-top-row{display:grid;grid-template-columns:1fr 1fr;min-height:0;border-bottom:1px solid var(--border);}
+/* lista projektów — lewa część */
+.projects-list{
+  width:420px;flex-shrink:0;
+  overflow-y:auto;padding:18px 14px 18px 20px;
+  display:flex;flex-direction:column;gap:10px;
+  border-right:1px solid var(--border);
+}
+.projects-list::-webkit-scrollbar{width:3px;}
+.projects-list::-webkit-scrollbar-thumb{background:var(--neon);border-radius:2px;}
 
-/* SCRIPT PANEL */
-.script-panel{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);}
-.script-select-row{flex-shrink:0;padding:6px 10px;background:var(--bg);border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:6px;align-items:center;}
-.script-dropdown{flex:1;background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:6px;
-  color:#fff;font-family:var(--mono);font-size:10px;padding:5px 8px;outline:none;cursor:pointer;}
+.proj-card{
+  background:var(--card);border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;padding:14px 16px;
+  cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:14px;
+}
+.proj-card::before{content:'';position:absolute;left:0;top:0;bottom:0;
+  width:3px;background:var(--c,var(--neon));border-radius:3px 0 0 3px;
+  box-shadow:0 0 10px var(--c,var(--neon));}
+.proj-card:hover{border-color:var(--c,var(--neon));transform:translateX(3px);
+  background:var(--card2);}
+.proj-card.active{border-color:var(--c,var(--neon));background:var(--card2);
+  box-shadow:0 0 20px rgba(0,0,0,.3);}
+.proj-card-icon{font-size:26px;flex-shrink:0;}
+.proj-card-info{flex:1;min-width:0;}
+.proj-card-name{font-size:13px;font-weight:700;letter-spacing:1px;color:#fff;margin-bottom:2px;}
+.proj-card-desc{font-family:var(--mono);font-size:9px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-card-tag{font-family:var(--mono);font-size:8px;padding:2px 7px;border-radius:4px;
+  border:1px solid rgba(255,255,255,.1);color:var(--muted);background:transparent;
+  white-space:nowrap;flex-shrink:0;}
+.proj-card-tag.online{color:var(--green);border-color:rgba(105,255,180,.3);}
+.proj-card-tag.vps{color:var(--yellow);border-color:rgba(255,215,64,.3);}
+.proj-card-tag.local{color:var(--purple);border-color:rgba(179,157,219,.3);}
+
+.add-proj-btn{
+  background:transparent;border:1px dashed rgba(0,229,255,.3);
+  border-radius:12px;padding:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--muted);
+  transition:all .2s;
+}
+.add-proj-btn:hover{border-color:var(--neon);color:var(--neon);}
+
+/* ── PANEL SZCZEGÓŁÓW ── */
+.detail-panel{
+  flex:1;min-width:0;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.detail-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;font-family:var(--mono);font-size:12px;color:var(--muted);
+}
+.detail-empty .big{font-size:48px;}
+
+.detail-top{flex-shrink:0;padding:16px 20px 12px;border-bottom:1px solid var(--border);
+  background:var(--panel);display:flex;align-items:center;justify-content:space-between;}
+.detail-title{display:flex;align-items:center;gap:12px;}
+.detail-icon{font-size:28px;}
+.detail-name{font-size:16px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px;}
+.detail-desc{font-family:var(--mono);font-size:9px;color:var(--muted);}
+.detail-actions{display:flex;gap:8px;align-items:center;}
+.open-link-btn{
+  padding:8px 18px;border-radius:8px;font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:1px;text-decoration:none;border:1px solid;transition:all .2s;white-space:nowrap;
+  display:flex;align-items:center;gap:6px;
+}
+.open-link-btn:hover{color:#000!important;}
+.edit-proj-btn{padding:7px 12px;border-radius:7px;font-family:var(--mono);font-size:9px;
+  color:var(--muted);border:1px solid rgba(255,255,255,.12);background:transparent;
+  cursor:pointer;transition:all .2s;}
+.edit-proj-btn:hover{color:#fff;border-color:rgba(255,255,255,.3);}
+
+/* ── STATS ── */
+.stats-row{flex-shrink:0;display:flex;gap:0;border-bottom:1px solid var(--border);}
+.stat-box{flex:1;padding:14px 16px;text-align:center;border-right:1px solid var(--border);
+  position:relative;overflow:hidden;}
+.stat-box:last-child{border-right:none;}
+.stat-val{font-size:26px;font-weight:800;font-family:var(--mono);margin-bottom:3px;}
+.stat-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.stat-box.loading .stat-val{opacity:.3;}
+.stats-none{flex-shrink:0;padding:12px 20px;font-family:var(--mono);font-size:10px;color:var(--muted);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+
+/* ── DETAIL BODY: notes + scripts side by side ── */
+.detail-body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;}
+
+/* NOTES panel */
+.dnotes{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--border);}
+.dpanel-hdr{flex-shrink:0;padding:8px 14px;background:var(--panel2);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  display:flex;align-items:center;justify-content:space-between;}
+.dpanel-hdr-l{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:#fff;font-weight:600;}
+.note-status{font-family:var(--mono);font-size:9px;color:var(--muted);}
+.note-ta{flex:1;min-height:0;width:100%;resize:none;background:var(--bg);
+  border:none;outline:none;font-family:var(--mono);font-size:12px;color:#fff;
+  line-height:1.85;padding:12px 14px;}
+.note-ta::placeholder{color:rgba(144,144,184,.4);}
+.note-ta::-webkit-scrollbar{width:3px;}
+.note-ta::-webkit-scrollbar-thumb{background:rgba(0,229,255,.2);border-radius:2px;}
+
+/* SCRIPTS panel */
+.dscripts{display:flex;flex-direction:column;min-height:0;}
+.script-sel-row{flex-shrink:0;padding:6px 10px;background:var(--bg);
+  border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:6px;align-items:center;}
+.script-dropdown{flex:1;background:var(--panel);border:1px solid rgba(255,255,255,.12);
+  border-radius:6px;color:#fff;font-family:var(--mono);font-size:10px;
+  padding:5px 8px;outline:none;cursor:pointer;}
 .script-dropdown option{background:var(--card);}
 .script-dropdown:focus{border-color:var(--neon);}
-.script-del-sel{padding:4px 8px;border-radius:5px;font-size:10px;
+.sdel-btn{padding:4px 8px;border-radius:5px;font-size:10px;
   color:var(--red);border:1px solid rgba(255,107,107,.2);background:transparent;cursor:pointer;transition:all .15s;}
-.script-del-sel:hover{background:rgba(255,107,107,.1);}
+.sdel-btn:hover{background:rgba(255,107,107,.1);}
 .script-body{flex:1;min-height:0;overflow-y:auto;padding:10px 12px;}
-.script-body::-webkit-scrollbar{width:4px;}
-.script-body::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:2px;}
-.script-empty{font-family:var(--mono);font-size:10px;color:var(--muted);padding:8px 2px;}
+.script-body::-webkit-scrollbar{width:3px;}
+.script-body::-webkit-scrollbar-thumb{background:rgba(0,229,255,.2);border-radius:2px;}
+.script-empty{font-family:var(--mono);font-size:10px;color:var(--muted);padding:6px 2px;}
 .script-name{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--neon);margin-bottom:8px;}
-.script-instructions{font-family:var(--mono);font-size:11px;color:#fff;line-height:1.8;
-  white-space:pre-wrap;word-break:break-word;}
-.script-copy-btn{margin-top:10px;padding:5px 14px;border-radius:6px;font-family:var(--mono);font-size:9px;
-  letter-spacing:1px;color:var(--neon);border:1px solid rgba(0,229,255,.35);background:transparent;
-  cursor:pointer;transition:all .2s;display:inline-block;}
+.script-instructions{font-family:var(--mono);font-size:11px;color:#fff;
+  line-height:1.8;white-space:pre-wrap;word-break:break-word;}
+.script-copy-btn{margin-top:10px;padding:5px 14px;border-radius:6px;font-family:var(--mono);
+  font-size:9px;letter-spacing:1px;color:var(--neon);border:1px solid rgba(0,229,255,.35);
+  background:transparent;cursor:pointer;transition:all .2s;display:inline-block;}
 .script-copy-btn:hover{background:rgba(0,229,255,.12);}
+.add-script-btn{padding:4px 12px;border-radius:5px;font-family:var(--mono);font-size:9px;
+  letter-spacing:1px;color:var(--neon);border:1px solid rgba(0,229,255,.3);
+  background:transparent;cursor:pointer;transition:all .2s;}
+.add-script-btn:hover{background:rgba(0,229,255,.1);}
 
-/* CMD PANEL */
-.cmd-panel{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--border);}
-.panel-hdr{flex-shrink:0;padding:7px 14px;display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid rgba(255,255,255,.07);background:var(--card);}
-.panel-hdr-l{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:#fff;font-weight:600;}
-.add-btn{padding:4px 12px;border-radius:5px;font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  color:var(--neon);border:1px solid rgba(0,229,255,.35);background:transparent;cursor:pointer;transition:all .2s;}
-.add-btn:hover{background:rgba(0,229,255,.12);}
-.cmd-scroll{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:5px;}
-.cmd-scroll::-webkit-scrollbar{width:4px;}
-.cmd-scroll::-webkit-scrollbar-track{background:transparent;}
-.cmd-scroll::-webkit-scrollbar-thumb{background:rgba(0,229,255,.35);border-radius:2px;}
+/* ══════════════════════════════
+   RIGHT COL (stały)
+══════════════════════════════ */
+.right-col{width:320px;flex-shrink:0;display:flex;flex-direction:column;
+  overflow:hidden;background:var(--surface);border-left:1px solid var(--border);}
 
-/* CMD ROW */
-.cmd-row{display:flex;align-items:flex-start;gap:8px;background:var(--panel);
-  border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:8px 10px;transition:border-color .2s;}
-.cmd-row:hover{border-color:rgba(0,229,255,.3);}
-.cmd-txt{flex:1;min-width:0;}
-.cmd-name{font-family:var(--mono);font-size:11px;color:#fff;line-height:1.4;font-weight:600;}
-.cmd-code{font-family:var(--mono);font-size:10px;color:var(--neon);margin-top:3px;
-  line-height:1.6;white-space:pre-wrap;word-break:break-all;opacity:.8;}
-.cmd-acts{display:flex;gap:4px;flex-shrink:0;padding-top:1px;}
-.btn-copy{padding:4px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  color:var(--neon);border:1px solid rgba(0,229,255,.35);background:transparent;cursor:pointer;
-  transition:all .15s;white-space:nowrap;}
-.btn-copy:hover{background:rgba(0,229,255,.15);}
-.btn-del{padding:4px 7px;border-radius:5px;font-size:11px;line-height:1;
-  color:var(--red);border:1px solid rgba(255,107,107,.2);background:transparent;cursor:pointer;transition:all .15s;}
-.btn-del:hover{background:rgba(255,107,107,.12);}
-.empty-cmds{font-family:var(--mono);font-size:10px;color:var(--muted);padding:10px 4px;}
-
-/* NOTE PANEL */
-.note-panel{display:flex;flex-direction:column;min-height:0;}
-.note-status{font-family:var(--mono);font-size:9px;color:var(--muted);}
-.note-ta{flex:1;min-height:0;width:100%;resize:none;background:var(--bg);border:none;outline:none;
-  font-family:var(--mono);font-size:12px;color:#fff;line-height:1.85;padding:12px 14px;}
-.note-ta::placeholder{color:rgba(160,160,192,.4);}
-.note-ta::-webkit-scrollbar{width:4px;}
-.note-ta::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:2px;}
-
-/* RIGHT COL */
-.right-col{display:flex;flex-direction:column;overflow:hidden;background:var(--surface);}
-.stat-box{flex-shrink:0;padding:11px 14px;border-bottom:1px solid var(--border);}
+.stat-sys-box{flex-shrink:0;padding:11px 14px;border-bottom:1px solid var(--border);}
 .box-lbl{font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);margin-bottom:7px;}
 .srow{display:flex;justify-content:space-between;align-items:center;padding:2px 0;}
 .sk{font-family:var(--mono);font-size:10px;color:var(--text2);}
 .sv{font-family:var(--mono);font-size:10px;display:flex;align-items:center;gap:5px;}
 
-/* OTHER PROJECTS */
-.other-box{flex-shrink:0;padding:9px 12px;border-bottom:1px solid var(--border);}
-.other-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
-.chips{display:flex;flex-wrap:wrap;gap:4px;}
-.chip-a{padding:4px 10px;border-radius:6px;font-family:var(--mono);font-size:9px;
-  font-weight:600;text-decoration:none;border:1px solid rgba(0,229,255,.3);
-  color:#fff;background:transparent;transition:all .2s;display:flex;align-items:center;gap:5px;}
-.chip-a:hover{background:rgba(0,229,255,.15);border-color:var(--neon);}
-.chip-del{background:transparent;border:none;color:rgba(255,107,107,.8);cursor:pointer;
-  font-size:12px;padding:0 0 0 4px;line-height:1;transition:color .2s;font-weight:700;}
-.chip-del:hover{color:var(--red);}
-
-/* LINKS TAB VIEW */
-.links-view{display:none;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);}
-.links-view.active{display:flex;}
-.links-top{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
-  padding:12px 18px 10px;border-bottom:1px solid var(--border);background:var(--panel);}
-.links-top-title{font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#fff;}
-.links-top-sub{font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:2px;}
-.links-grid{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;align-content:start;}
-.links-grid::-webkit-scrollbar{width:4px;}
-.links-grid::-webkit-scrollbar-thumb{background:rgba(0,229,255,.3);border-radius:2px;}
-.link-card{background:var(--card);border:1px solid rgba(255,255,255,.09);border-radius:10px;
-  padding:13px 14px;display:flex;align-items:flex-start;justify-content:space-between;
-  gap:8px;transition:border-color .2s;}
-.link-card:hover{border-color:rgba(0,229,255,.3);}
-.link-card-left{flex:1;min-width:0;}
-.link-card-name{font-size:12px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
-.link-card-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.link-card-url{font-family:var(--mono);font-size:9px;color:var(--muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
-.link-card-url a{color:var(--neon);text-decoration:none;}
-.link-card-url a:hover{text-decoration:underline;}
-.link-card-actions{display:flex;gap:5px;flex-shrink:0;}
-.lc-open{padding:4px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;
-  color:var(--neon);border:1px solid rgba(0,229,255,.3);background:transparent;
-  text-decoration:none;transition:all .15s;white-space:nowrap;}
-.lc-open:hover{background:rgba(0,229,255,.12);}
-.lc-del{padding:4px 7px;border-radius:5px;font-size:11px;line-height:1;
-  color:var(--red);border:1px solid rgba(255,107,107,.25);background:transparent;cursor:pointer;transition:all .15s;}
-.lc-del:hover{background:rgba(255,107,107,.12);}
-.link-card-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px;}
-.lc-edit{padding:4px 7px;border-radius:5px;font-size:12px;line-height:1;
-  border:1px solid rgba(255,255,255,.15);background:transparent;cursor:pointer;transition:all .15s;}
-.lc-edit:hover{background:rgba(255,255,255,.1);}
-.links-empty{font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px 4px;grid-column:1/-1;}
-.add-link-btn{padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;
-  color:var(--neon);border:1px solid rgba(0,229,255,.3);background:transparent;cursor:pointer;transition:all .2s;}
-.add-link-btn:hover{background:rgba(0,229,255,.1);}
-
-/* GLOBAL NOTE */
 .gnote-box{flex:1;min-height:0;display:flex;flex-direction:column;}
-.gnote-hdr{flex-shrink:0;padding:8px 13px;border-bottom:1px solid var(--border);
+.gnote-hdr{flex-shrink:0;padding:9px 14px;border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;}
 .gnote-hdr-l{font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);}
 .gnote-btns{display:flex;gap:4px;}
 .gnb{padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  color:var(--muted);border:1px solid rgba(255,255,255,.1);background:transparent;cursor:pointer;transition:all .2s;}
+  color:var(--muted);border:1px solid rgba(255,255,255,.08);background:transparent;cursor:pointer;transition:all .2s;}
 .gnb:hover{color:var(--neon);border-color:var(--neon);}
 .gnb.sv{color:var(--green);border-color:rgba(105,255,180,.3);}
-.gnb.sv:hover{background:rgba(105,255,180,.08);}
+.gnb.sv:hover{background:rgba(105,255,180,.07);}
 #gnp{flex:1;min-height:0;resize:none;border:none;outline:none;background:var(--bg);
   font-family:var(--mono);font-size:12px;color:#fff;line-height:1.9;padding:12px 14px;width:100%;}
-#gnp::placeholder{color:rgba(160,160,192,.35);}
-#gnp::-webkit-scrollbar{width:4px;}
-#gnp::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:2px;}
+#gnp::placeholder{color:rgba(144,144,184,.35);}
+#gnp::-webkit-scrollbar{width:3px;}
+#gnp::-webkit-scrollbar-thumb{background:rgba(0,229,255,.2);border-radius:2px;}
 .gnote-ft{flex-shrink:0;padding:4px 13px;border-top:1px solid var(--border);
   font-family:var(--mono);font-size:9px;color:var(--muted);}
 
-/* MODALS */
-.ov{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);
+/* ══════════════════════════════
+   LINKS TAB
+══════════════════════════════ */
+.links-view{flex-direction:column;overflow:hidden;}
+.links-top-bar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel);}
+.links-top-bar h2{font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#fff;}
+.links-top-bar p{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;}
+.links-grid-wrap{flex:1;overflow-y:auto;padding:16px;}
+.links-grid-wrap::-webkit-scrollbar{width:3px;}
+.links-grid-wrap::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:2px;}
+.links-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;align-content:start;}
+
+.link-card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:10px;
+  padding:13px 14px;display:flex;align-items:flex-start;justify-content:space-between;
+  gap:8px;transition:border-color .2s;}
+.link-card:hover{border-color:rgba(0,229,255,.25);}
+.link-card-left{flex:1;min-width:0;}
+.link-card-name{font-size:12px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.link-card-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.link-card-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px;}
+.link-card-url{font-family:var(--mono);font-size:9px;}
+.link-card-url a{color:var(--neon);text-decoration:none;}
+.link-card-url a:hover{text-decoration:underline;}
+.lc-novps{color:var(--yellow);}
+.link-card-actions{display:flex;gap:4px;flex-shrink:0;}
+.lc-open{padding:4px 9px;border-radius:5px;font-family:var(--mono);font-size:9px;
+  color:var(--neon);border:1px solid rgba(0,229,255,.3);background:transparent;
+  text-decoration:none;transition:all .15s;white-space:nowrap;}
+.lc-open:hover{background:rgba(0,229,255,.12);}
+.lc-edit{padding:4px 7px;border-radius:5px;font-size:12px;line-height:1;
+  border:1px solid rgba(255,255,255,.12);background:transparent;cursor:pointer;transition:all .15s;}
+.lc-edit:hover{background:rgba(255,255,255,.1);}
+.lc-del{padding:4px 7px;border-radius:5px;font-size:11px;line-height:1;
+  color:var(--red);border:1px solid rgba(255,107,107,.2);background:transparent;cursor:pointer;transition:all .15s;}
+.lc-del:hover{background:rgba(255,107,107,.1);}
+.links-empty{font-family:var(--mono);font-size:10px;color:var(--muted);padding:20px 0;}
+
+/* ══════════════════════════════
+   MODALS
+══════════════════════════════ */
+.ov{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.72);
   backdrop-filter:blur(10px);align-items:center;justify-content:center;}
 .ov.open{display:flex;}
 .modal{background:var(--card2);border:1px solid var(--border);border-radius:13px;
-  padding:22px;width:460px;max-width:95vw;box-shadow:0 0 50px rgba(0,229,255,.1);}
+  padding:22px;width:480px;max-width:95vw;box-shadow:0 0 50px rgba(0,229,255,.1);}
 .modal h3{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
   color:var(--neon);margin-bottom:16px;}
 .modal label{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--muted);
   display:block;margin-bottom:4px;}
-.modal input,.modal textarea{width:100%;margin-bottom:12px;background:var(--bg);
+.modal input,.modal textarea,.modal select{width:100%;margin-bottom:12px;background:var(--bg);
   border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:8px 11px;color:#fff;
   font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s;}
+.modal select option{background:var(--card2);}
 .modal textarea{min-height:75px;resize:vertical;}
-.modal input:focus,.modal textarea:focus{border-color:var(--neon);}
-.mbtns{display:flex;gap:7px;justify-content:flex-end;}
-.mbt{padding:6px 16px;border-radius:6px;cursor:pointer;font-family:var(--mono);
+.modal input:focus,.modal textarea:focus,.modal select:focus{border-color:var(--neon);}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.modal-row>div{display:flex;flex-direction:column;}
+.mbtns{display:flex;gap:7px;justify-content:flex-end;margin-top:4px;}
+.mbt{padding:7px 18px;border-radius:6px;cursor:pointer;font-family:var(--mono);
   font-size:9px;letter-spacing:1px;border:1px solid;transition:all .2s;}
 .mbt.cx{color:var(--muted);border-color:rgba(255,255,255,.1);background:transparent;}
 .mbt.cx:hover{color:var(--red);border-color:var(--red);}
 .mbt.ok{color:var(--neon);border-color:var(--neon);background:rgba(0,229,255,.05);}
 .mbt.ok:hover{background:var(--neon);color:#111;}
-
-/* SAVE INDICATOR */
-.saving{font-family:var(--mono);font-size:8px;color:var(--muted);margin-left:6px;}
 
 /* TOAST */
 #toast{position:fixed;bottom:16px;right:16px;z-index:999;background:var(--card2);
@@ -359,7 +404,7 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
 </head>
 <body>
 
-<!-- ══ LOGIN SCREEN ══ -->
+<!-- LOGIN -->
 <div id="login-screen">
   <div class="login-logo">
     <div class="login-icon">⚡</div>
@@ -372,20 +417,17 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
   </button>
 </div>
 
-<!-- ══ APP ══ -->
+<!-- APP -->
 <div id="app">
   <header>
     <div class="logo">
       <div class="logo-icon">⚡</div>
-      <div>
-        <h1>WojDash</h1>
-        <p>// COMMAND CENTER v4</p>
-      </div>
+      <div><h1>WojDash</h1><p>// COMMAND CENTER v5</p></div>
     </div>
     <div class="hdr-r">
       <span class="pdot"></span>
       <div><div id="clock">--:--:--</div><div id="dstr"></div></div>
-      <div class="user-info" title="Kliknij aby wylogować" onclick="doLogout()">
+      <div class="user-info" onclick="doLogout()">
         <img id="user-avatar" src="" alt="">
         <span id="user-name"></span>
         <button class="logout-btn">✕</button>
@@ -393,46 +435,103 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
     </div>
   </header>
 
-  <div class="tabs-bar" id="tabs-bar">
-    <button class="tab-btn" id="tab-links" onclick="switchTab('__links__')"><span class="ti">🔗</span>LINKI</button>
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="switchTab('home')" data-tab="home">
+      <span class="ti">🏠</span>PROJEKTY
+    </button>
+    <button class="tab-btn" onclick="switchTab('links')" data-tab="links">
+      <span class="ti">🔗</span>LINKI
+    </button>
   </div>
 
   <div class="body-area">
-    <div id="views-wrap" style="display:contents;">
-      <!-- LINKS VIEW — always rendered -->
-      <div class="links-view" id="pv-__links__">
-        <div class="links-top">
-          <div>
-            <div class="links-top-title">🔗 Moje Projekty i Linki</div>
-            <div class="links-top-sub">Wszystkie aplikacje, strony HTML, narzędzia — kliknij aby otworzyć</div>
-          </div>
-          <button class="add-btn" onclick="openLinkModal()">+ DODAJ PROJEKT / LINK</button>
+
+    <!-- ══ HOME TAB ══ -->
+    <div class="tab-view home-view active" id="tab-home">
+      <div class="home-inner">
+
+        <!-- lista projektów -->
+        <div class="projects-list" id="projects-list">
+          <!-- generowane JS -->
         </div>
+
+        <!-- panel szczegółów -->
+        <div class="detail-panel" id="detail-panel">
+          <div class="detail-empty" id="detail-empty">
+            <div class="big">👈</div>
+            <div>Wybierz projekt z listy</div>
+          </div>
+          <div id="detail-content" style="display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;">
+            <!-- top -->
+            <div class="detail-top">
+              <div class="detail-title">
+                <div class="detail-icon" id="d-icon"></div>
+                <div>
+                  <div class="detail-name" id="d-name"></div>
+                  <div class="detail-desc" id="d-desc"></div>
+                </div>
+              </div>
+              <div class="detail-actions">
+                <button class="edit-proj-btn" onclick="editCurrentProject()">✏️ Edytuj</button>
+                <a href="#" target="_blank" class="open-link-btn" id="d-open-btn">↗ OTWÓRZ</a>
+              </div>
+            </div>
+            <!-- stats -->
+            <div id="d-stats-area"></div>
+            <!-- body: notes + scripts -->
+            <div class="detail-body">
+              <div class="dnotes">
+                <div class="dpanel-hdr">
+                  <span class="dpanel-hdr-l">📝 NOTATKI</span>
+                  <span class="note-status" id="d-note-status">Ctrl+S = zapisz</span>
+                </div>
+                <textarea class="note-ta" id="d-note-ta" placeholder="// Notatki projektu...&#10;// URL, tokeny, uwagi, IP..."></textarea>
+              </div>
+              <div class="dscripts">
+                <div class="dpanel-hdr">
+                  <span class="dpanel-hdr-l">📜 SKRYPTY</span>
+                  <button class="add-script-btn" id="d-add-script-btn">+ DODAJ</button>
+                </div>
+                <div class="script-sel-row">
+                  <select class="script-dropdown" id="d-script-sel" onchange="showDetailScript()">
+                    <option value="">— wybierz skrypt —</option>
+                  </select>
+                  <button class="sdel-btn" onclick="deleteDetailScript()" title="Usuń wybrany">✕</button>
+                </div>
+                <div class="script-body" id="d-script-body">
+                  <div class="script-empty">Wybierz skrypt lub dodaj nowy ↗</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ LINKS TAB ══ -->
+    <div class="tab-view links-view" id="tab-links">
+      <div class="links-top-bar">
+        <div>
+          <h2>🔗 Moje projekty i linki</h2>
+          <p>Wszystkie aplikacje, strony HTML, narzędzia</p>
+        </div>
+        <button class="add-script-btn" onclick="openLinkModal()">+ DODAJ</button>
+      </div>
+      <div class="links-grid-wrap">
         <div class="links-grid" id="links-grid"></div>
       </div>
     </div>
 
+    <!-- ══ RIGHT COL ══ -->
     <div class="right-col">
-      <!-- STATUS -->
-      <div class="stat-box">
+      <div class="stat-sys-box">
         <div class="box-lbl">● STATUS SYSTEMU</div>
         <div class="srow"><span class="sk">VPS (Ubuntu)</span><span class="sv" style="color:var(--green)"><span class="pdot"></span>ONLINE</span></div>
         <div class="srow"><span class="sk">FIREBASE</span><span class="sv" style="color:var(--green)"><span class="pdot"></span>CONNECTED</span></div>
         <div class="srow"><span class="sk">VERCEL</span><span class="sv" style="color:var(--green)"><span class="pdot"></span>DEPLOYED</span></div>
         <div class="srow"><span class="sk">PM2 BOTY</span><span class="sv" style="color:var(--yellow)"><span class="pdot" style="background:var(--yellow);box-shadow:0 0 6px var(--yellow)"></span>SPRAWDŹ</span></div>
-        <div class="srow"><span class="sk">TELETHON</span><span class="sv" style="color:var(--yellow)"><span class="pdot" style="background:var(--yellow);box-shadow:0 0 6px var(--yellow)"></span>SPRAWDŹ</span></div>
       </div>
-
-      <!-- OTHER PROJECTS -->
-      <div class="other-box">
-        <div class="other-hdr">
-          <div class="box-lbl" style="margin:0">🪙 INNE PROJEKTY</div>
-          <button class="add-link-btn" onclick="openLinkModal()">+ DODAJ</button>
-        </div>
-        <div class="chips" id="other-chips"></div>
-      </div>
-
-      <!-- GLOBAL NOTE -->
       <div class="gnote-box">
         <div class="gnote-hdr">
           <span class="gnote-hdr-l">📋 NOTATNIK GLOBALNY</span>
@@ -441,59 +540,61 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
             <button class="gnb sv" onclick="svG()">✓ ZAPISZ</button>
           </div>
         </div>
-        <textarea id="gnp" placeholder="// Globalne notatki: IP, SSH, tokeny, linki...
-// ssh user@IP_VPS
-// Ctrl+S = auto-zapis"></textarea>
+        <textarea id="gnp" placeholder="// Globalne notatki: IP, SSH, tokeny...&#10;// Ctrl+S = auto-zapis"></textarea>
         <div class="gnote-ft" id="gc">0 znaków</div>
       </div>
     </div>
+
   </div>
 </div>
 
-<!-- ══ MODAL: CMD ══ -->
-<div class="ov" id="modal-cmd">
-  <div class="modal">
-    <h3>➕ Dodaj komendę</h3>
-    <label>NAZWA / OPIS</label>
-    <input type="text" id="mn" placeholder="np. Restart bota Signal">
-    <label>KOMENDA (Enter = nowa linia, wieloliniowa OK)</label>
-    <textarea id="mc" placeholder="cd /home/wojtek/signal-monitor&#10;pm2 restart signal-monitor"></textarea>
+<!-- MODAL: PROJEKT (dodaj/edytuj) -->
+<div class="ov" id="modal-proj">
+  <div class="modal" style="width:520px;">
+    <h3 id="mp-title">➕ Dodaj projekt</h3>
+    <div class="modal-row">
+      <div>
+        <label>NAZWA *</label>
+        <input type="text" id="mp-name" placeholder="np. XPost Manager">
+      </div>
+      <div>
+        <label>EMOJI / IKONA</label>
+        <input type="text" id="mp-icon" placeholder="📋" maxlength="4">
+      </div>
+    </div>
+    <label>OPIS (krótki)</label>
+    <input type="text" id="mp-desc" placeholder="np. Posty X · TG Sygnały">
+    <label>URL (opcjonalne — zostaw puste jeśli VPS only)</label>
+    <input type="text" id="mp-url" placeholder="https://...">
+    <div class="modal-row">
+      <div>
+        <label>KOLOR (hex)</label>
+        <input type="text" id="mp-color" placeholder="#00e5ff">
+      </div>
+      <div>
+        <label>TYP</label>
+        <select id="mp-type">
+          <option value="vercel">🌐 Vercel / Web</option>
+          <option value="vps">⚙️ VPS only</option>
+          <option value="local">📄 Plik HTML (lokalny)</option>
+        </select>
+      </div>
+    </div>
     <div class="mbtns">
-      <button class="mbt cx" onclick="closeModal('modal-cmd')">ANULUJ</button>
-      <button class="mbt ok" onclick="addCmd()">DODAJ</button>
+      <button class="mbt cx" onclick="closeModal('modal-proj')">ANULUJ</button>
+      <button class="mbt ok" onclick="saveProject()">ZAPISZ</button>
     </div>
   </div>
 </div>
 
-<!-- ══ MODAL: LINK ══ -->
-<div class="ov" id="modal-link">
-  <div class="modal">
-    <h3 id="lm-title">➕ Dodaj projekt / link</h3>
-    <label>NAZWA *</label>
-    <input type="text" id="ln" placeholder="np. GM Deploy Bot">
-    <label>URL (opcjonalne — zostaw puste jeśli tylko VPS)</label>
-    <input type="text" id="lu" placeholder="https://... lub zostaw puste">
-    <label>OPIS (opcjonalne)</label>
-    <input type="text" id="ld" placeholder="np. Codzienne GM na różnych sieciach">
-    <label>EMOJI / IKONA (opcjonalne)</label>
-    <input type="text" id="li" placeholder="np. 🌅" maxlength="4">
-    <label>KOLOR (hex, opcjonalnie)</label>
-    <input type="text" id="lc" placeholder="#ffd740">
-    <div class="mbtns">
-      <button class="mbt cx" onclick="closeModal('modal-link')">ANULUJ</button>
-      <button class="mbt ok" onclick="saveLinkModal()">ZAPISZ</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL: SKRYPT ══ -->
+<!-- MODAL: SKRYPT -->
 <div class="ov" id="modal-script">
   <div class="modal" style="width:540px;">
     <h3>📜 Dodaj skrypt / instrukcję</h3>
     <label>NAZWA SKRYPTU *</label>
     <input type="text" id="sm-n" placeholder="np. Ręczne dodawanie pozycji">
-    <label>INSTRUKCJA / OPIS (może być wieloliniowy)</label>
-    <textarea id="sm-b" style="min-height:180px;" placeholder="cd /home/signal-bot&#10;python3 add_position.py&#10;&#10;Skrypt przeprowadzi Cię przez dodanie pozycji krok po kroku...&#10;Symbol: AGT&#10;Kierunek: SHORT&#10;..."></textarea>
+    <label>INSTRUKCJA / OPIS (wieloliniowy)</label>
+    <textarea id="sm-b" style="min-height:160px;" placeholder="cd /home/signal-bot&#10;python3 add_position.py&#10;&#10;Instrukcja krok po kroku..."></textarea>
     <div class="mbtns">
       <button class="mbt cx" onclick="closeModal('modal-script')">ANULUJ</button>
       <button class="mbt ok" onclick="saveScript()">ZAPISZ SKRYPT</button>
@@ -501,425 +602,271 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
   </div>
 </div>
 
+<!-- MODAL: LINK -->
+<div class="ov" id="modal-link">
+  <div class="modal">
+    <h3 id="lm-title">➕ Dodaj projekt / link</h3>
+    <label>NAZWA *</label>
+    <input type="text" id="ln" placeholder="np. FluxPay">
+    <label>URL (opcjonalne)</label>
+    <input type="text" id="lu" placeholder="https://...">
+    <label>OPIS (opcjonalne)</label>
+    <input type="text" id="ld" placeholder="np. DeFi app Arc Testnet">
+    <div class="modal-row">
+      <div><label>EMOJI</label><input type="text" id="li" placeholder="💸" maxlength="4"></div>
+      <div><label>KOLOR (hex)</label><input type="text" id="lc" placeholder="#ffd740"></div>
+    </div>
+    <div class="mbtns">
+      <button class="mbt cx" onclick="closeModal('modal-link')">ANULUJ</button>
+      <button class="mbt ok" onclick="saveLinkModal()">ZAPISZ</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-/* ══════════════════════════════════
-   PROJECTS DATA
-══════════════════════════════════ */
-const PROJECTS = [
-  { id:'xpost', icon:'📋', name:'XPost Manager', color:'#00e5ff',
-    url:'https://xpost-manager.vercel.app',
-    desc:'Posty X · TG Sygnały · TG Wpisy · monitoring kanałów',
-    cmds:[
-      {n:'Status wszystkich botów PM2',         c:'pm2 status'},
-      {n:'Restart XPost Manager',               c:'pm2 restart xpost-manager'},
-      {n:'Logi XPost (50 linii)',               c:'pm2 logs xpost-manager --lines 50'},
-      {n:'Stop XPost',                          c:'pm2 stop xpost-manager'},
-      {n:'Start XPost od zera',                 c:'cd /home/wojtek/xpost-manager\npm2 start app.js --name xpost-manager'},
-      {n:'Deploy — pull + restart',             c:'cd /home/wojtek/xpost-manager\ngit pull && pm2 restart xpost-manager'},
-      {n:'Zainstaluj zależności',               c:'cd /home/wojtek/xpost-manager && npm install'},
-    ]},
-  { id:'signal', icon:'📡', name:'Signal Monitor (TG)', color:'#ff6b9d',
-    url:'#',
-    desc:'Telethon · monitoring kanałów Telegram · sygnały · wpisy',
-    cmds:[
-      {n:'Status Signal Monitor',               c:'pm2 status signal-monitor'},
-      {n:'Restart Signal Monitor',              c:'pm2 restart signal-monitor'},
-      {n:'Stop Signal Monitor',                 c:'pm2 stop signal-monitor'},
-      {n:'Start Signal Monitor (Python)',        c:'cd /home/wojtek/signal-monitor\npm2 start main.py --interpreter python3 --name signal-monitor'},
-      {n:'Logi Signal (80 linii)',              c:'pm2 logs signal-monitor --lines 80'},
-      {n:'⚠️ Ręczne dodanie sygnału',          c:'cd /home/wojtek/signal-monitor\npython3 add_signal_manual.py'},
-      {n:'🧹 Czyszczenie Firebase (stare)',    c:'cd /home/wojtek/signal-monitor\npython3 cleanup_firebase.py'},
-      {n:'🔄 Re-auth sesji Telegram',          c:'cd /home/wojtek/signal-monitor\npython3 auth_session.py'},
-      {n:'Lista obserwowanych kanałów',         c:'cd /home/wojtek/signal-monitor\npython3 list_channels.py'},
-      {n:'Deploy — pull + restart',             c:'cd /home/wojtek/signal-monitor\ngit pull && pm2 restart signal-monitor'},
-    ]},
-  { id:'kurator', icon:'⚖️', name:'Aplikacja Kuratora', color:'#69ffb4',
-    url:'https://kurator.vercel.app',
-    desc:'Karty Czynności · Sprawozdania · prompty AI · Firebase',
-    cmds:[
-      {n:'Restart serwera Node.js',             c:'pm2 restart kurator-server'},
-      {n:'Logi serwera kurator',                c:'pm2 logs kurator-server --lines 50'},
-      {n:'Start serwer Node',                   c:'cd /home/wojtek/kurator\npm2 start server.js --name kurator-server'},
-      {n:'📥 Pobierz nowe maile (IMAP)',        c:'cd /home/wojtek/kurator\nnode fetch_emails.js'},
-      {n:'📄 Generuj Kartę Czynności z maila', c:'cd /home/wojtek/kurator\nnode generate_karta.js'},
-      {n:'🗂️ Wyślij do Google Drive',         c:'cd /home/wojtek/kurator\nnode upload_drive.js'},
-      {n:'Zainstaluj zależności',               c:'cd /home/wojtek/kurator && npm install'},
-      {n:'Deploy — pull + restart',             c:'cd /home/wojtek/kurator\ngit pull && pm2 restart kurator-server'},
-    ]},
-  { id:'tiktok', icon:'🎵', name:'TikTok Monitor', color:'#ff6b6b',
-    url:'#',
-    desc:'yt-dlp · Whisper · Firebase · auto-transkrypcje',
-    cmds:[
-      {n:'Status TikTok Monitor',               c:'pm2 status tiktok-monitor'},
-      {n:'Restart TikTok Monitor',              c:'pm2 restart tiktok-monitor'},
-      {n:'Stop TikTok Monitor',                 c:'pm2 stop tiktok-monitor'},
-      {n:'Start TikTok Monitor (Python)',        c:'cd /home/wojtek/tiktok-monitor\npm2 start main.py --interpreter python3 --name tiktok-monitor'},
-      {n:'Logi TikTok (80 linii)',              c:'pm2 logs tiktok-monitor --lines 80'},
-      {n:'⬇️ Ręczny download + transkrypcja', c:'cd /home/wojtek/tiktok-monitor\npython3 manual_download.py https://vm.tiktok.com/LINK'},
-      {n:'🧹 Wyczyść stare pliki audio',       c:'cd /home/wojtek/tiktok-monitor\npython3 cleanup_audio.py'},
-      {n:'➕ Dodaj konto do śledzenia',        c:'cd /home/wojtek/tiktok-monitor\npython3 add_account.py @nazwaKonta'},
-      {n:'🔄 Aktualizuj yt-dlp',              c:'pip install -U yt-dlp --break-system-packages'},
-      {n:'Deploy — pull + restart',             c:'cd /home/wojtek/tiktok-monitor\ngit pull && pm2 restart tiktok-monitor'},
-    ]},
-  { id:'cryptotodo', icon:'✅', name:'CryptoToDo', color:'#b39ddb',
-    url:'https://cryptotodo.vercel.app',
-    desc:'Zadania i workflow krypto · Vercel + Firebase',
-    cmds:[
-      {n:'Pull najnowszy kod',                  c:'cd /home/wojtek/cryptotodo && git pull'},
-      {n:'Wdróż na Vercel (prod)',              c:'cd /home/wojtek/cryptotodo\nvercel --prod'},
-    ]},
-  { id:'xparaf', icon:'🤖', name:'XParafBot', color:'#40c4ff',
-    url:'https://xparafbot.vercel.app',
-    desc:'Bot krypto X · Groq AI · CoinGecko · 25+ źródeł',
-    cmds:[
-      {n:'Status XParafBot',                    c:'pm2 status xparafbot'},
-      {n:'Restart XParafBot',                   c:'pm2 restart xparafbot'},
-      {n:'Logi XParafBot (50 linii)',           c:'pm2 logs xparafbot --lines 50'},
-      {n:'Start bota',                          c:'cd /home/wojtek/xparafbot\npm2 start bot.js --name xparafbot'},
-      {n:'🔄 Aktualizuj dane CoinGecko',       c:'cd /home/wojtek/xparafbot\nnode update_coins.js'},
-      {n:'Deploy — pull + restart',             c:'cd /home/wojtek/xparafbot\ngit pull && pm2 restart xparafbot'},
-    ]},
-  { id:'cryptoquests', icon:'🎮', name:'CryptoQuests', color:'#ffd740',
-    url:'#',
-    desc:'Gamified DeFi platform · React+Vite / Node.js backend',
-    cmds:[
-      {n:'Restart backend CQ',                  c:'pm2 restart cryptoquests-api'},
-      {n:'Logi backend',                        c:'pm2 logs cryptoquests-api --lines 50'},
-      {n:'Start backend',                       c:'cd /home/wojtek/cryptoquests/backend\npm2 start server.js --name cryptoquests-api'},
-      {n:'Deploy backend',                      c:'cd /home/wojtek/cryptoquests/backend\ngit pull && npm install && pm2 restart cryptoquests-api'},
-    ]},
+/* ══════════════════════════════════════
+   DOMYŚLNE PROJEKTY (pierwsze uruchomienie)
+══════════════════════════════════════ */
+const DEFAULT_PROJECTS = [
+  {id:'xpost',        name:'XPost Manager',       icon:'📋', color:'#00e5ff', type:'vercel', url:'https://xpost-manager.vercel.app', desc:'Posty X · TG Sygnały · TG Wpisy'},
+  {id:'signal',       name:'Signal Monitor (TG)', icon:'📡', color:'#ff6b9d', type:'vps',    url:'', desc:'Telethon · monitoring kanałów TG'},
+  {id:'kurator',      name:'Aplikacja Kuratora',  icon:'⚖️', color:'#69ffb4', type:'vercel', url:'https://kurator-app.vercel.app',   desc:'Karty Czynności · Sprawozdania'},
+  {id:'tiktok',       name:'TikTok Monitor',      icon:'🎵', color:'#ff6b6b', type:'vps',    url:'', desc:'yt-dlp · Whisper · transkrypcje'},
+  {id:'cryptotodo',   name:'CryptoToDo',           icon:'✅', color:'#b39ddb', type:'vercel', url:'https://cryptotodo.vercel.app',    desc:'Zadania i workflow krypto'},
+  {id:'xparaf',       name:'XParafBot',            icon:'🤖', color:'#40c4ff', type:'vps',    url:'https://xparafbot.vercel.app',     desc:'Bot krypto X · Groq AI'},
 ];
 
-/* ══════════════════════════════════
-   DEFAULT LINKS — zapisywane do Firebase
-   przy pierwszym uruchomieniu, potem
-   zarządzane wyłącznie przez UI
-══════════════════════════════════ */
 const DEFAULT_LINKS = [
-  { id:'xpost',        n:'XPost Manager',       i:'📋', c:'#00e5ff', url:'https://xpost-manager.vercel.app', desc:'Posty X · TG Sygnały · TG Wpisy' },
-  { id:'signal',       n:'Signal Monitor (TG)', i:'📡', c:'#ff6b9d', url:'',                                 desc:'Telethon · monitoring kanałów TG' },
-  { id:'kurator',      n:'Aplikacja Kuratora',  i:'⚖️', c:'#69ffb4', url:'https://kurator.vercel.app',       desc:'Karty Czynności · Sprawozdania' },
-  { id:'tiktok',       n:'TikTok Monitor',      i:'🎵', c:'#ff6b6b', url:'',                                 desc:'yt-dlp · Whisper · transkrypcje' },
-  { id:'cryptotodo',   n:'CryptoToDo',          i:'✅', c:'#b39ddb', url:'https://cryptotodo.vercel.app',    desc:'Zadania i workflow krypto' },
-  { id:'xparaf',       n:'XParafBot',           i:'🤖', c:'#40c4ff', url:'https://xparafbot.vercel.app',     desc:'Bot krypto X · Groq AI' },
-  { id:'cryptoquests', n:'CryptoQuests',        i:'🎮', c:'#ffd740', url:'',                                 desc:'Gamified DeFi platform' },
-  { id:'opforge',      n:'OPForge',             i:'🔨', c:'#ffd740', url:'',                                 desc:'Token launcher OP_NET' },
-  { id:'pixelnft',     n:'PixelNFT',            i:'🖼️', c:'#ffd740', url:'',                                 desc:'Avatar gen · x402/USDC' },
-  { id:'rabbits',      n:'Happy Rabbits',       i:'🐰', c:'#ffd740', url:'',                                 desc:'NFT generator 3000 szt.' },
-  { id:'fluxpay',      n:'FluxPay',             i:'💸', c:'#ffd740', url:'',                                 desc:'DeFi app Arc Testnet' },
-  { id:'kiichainquiz', n:'KiiChain Quiz',       i:'🧩', c:'#b39ddb', url:'',                                 desc:'Quiz assistant workflow' },
-  { id:'cryptofeed',   n:'CryptoFeed',          i:'📰', c:'#00e5ff', url:'',                                 desc:'Agregator krypto newsów' },
-  { id:'xarticle',     n:'X Article Builder',   i:'✍️', c:'#00e5ff', url:'',                                 desc:'Prompt builder artykułów' },
-  { id:'gmailword',    n:'Gmail → Word',         i:'✉️', c:'#ff6b6b', url:'',                                 desc:'Karty z maili · Node.js' },
-  { id:'sprawozdania', n:'Sprawozdania',         i:'📝', c:'#69ffb4', url:'',                                 desc:'Generator sprawozdań HTML' },
+  {id:'cryptoquests', n:'CryptoQuests',   i:'🎮', c:'#ffd740', url:'', desc:'Gamified DeFi platform'},
+  {id:'opforge',      n:'OPForge',        i:'🔨', c:'#ffd740', url:'', desc:'Token launcher OP_NET'},
+  {id:'pixelnft',     n:'PixelNFT',       i:'🖼️', c:'#ffd740', url:'', desc:'Avatar gen · x402/USDC'},
+  {id:'rabbits',      n:'Happy Rabbits',  i:'🐰', c:'#ffd740', url:'', desc:'NFT generator 3000 szt.'},
+  {id:'fluxpay',      n:'FluxPay',        i:'💸', c:'#ffd740', url:'', desc:'DeFi app Arc Testnet'},
+  {id:'kiichain',     n:'KiiChain Quiz',  i:'🧩', c:'#b39ddb', url:'', desc:'Quiz assistant workflow'},
+  {id:'cryptofeed',   n:'CryptoFeed',     i:'📰', c:'#00e5ff', url:'', desc:'Agregator krypto newsów'},
+  {id:'xarticle',     n:'X Article Builder',i:'✍️',c:'#00e5ff',url:'', desc:'Prompt builder artykułów'},
+  {id:'gmailword',    n:'Gmail → Word',   i:'✉️', c:'#ff6b6b', url:'', desc:'Karty z maili · Node.js'},
+  {id:'sprawozdania', n:'Sprawozdania',   i:'📝', c:'#69ffb4', url:'', desc:'Generator sprawozdań HTML'},
 ];
 
-/* ══════════════════════════════════
-   FIREBASE HELPERS
-══════════════════════════════════ */
+/* ══════════════════════════════════════
+   STATE
+══════════════════════════════════════ */
+const STATE = {
+  projects: [],   // lista projektów (kafelki)
+  links:    [],   // zakładka Linki
+  notes:    {},   // notatki per projekt {pid: text}
+  scripts:  {},   // skrypty per projekt {pid: [{n,body}]}
+  global:   '',
+};
 let saveTimer = {};
-function userDocSimple(col, docId) {
+let activePid = null;
+let editProjIdx = null;
+let editLinkIdx = null;
+let scriptTargetPid = null;
+
+/* ══════════════════════════════════════
+   FIREBASE HELPERS
+══════════════════════════════════════ */
+function uDoc(col, docId) {
   return window._doc(window._db, 'users', window._uid, col, docId);
 }
-
 async function fbGet(col, docId) {
-  const snap = await window._getDoc(userDocSimple(col, docId));
-  return snap.exists() ? snap.data() : null;
+  try {
+    const snap = await window._getDoc(uDoc(col, docId));
+    return snap.exists() ? snap.data() : null;
+  } catch(e) { console.warn('fbGet error', col, docId, e); return null; }
 }
 async function fbSet(col, docId, data) {
-  await window._setDoc(userDocSimple(col, docId), data, { merge: true });
+  try { await window._setDoc(uDoc(col, docId), data, {merge:true}); }
+  catch(e) { console.warn('fbSet error', col, docId, e); }
 }
 
-/* ══════════════════════════════════
-   STATE
-══════════════════════════════════ */
-const STATE = { cmds:{}, notes:{}, links:[], global:'' };
-
+/* ══════════════════════════════════════
+   LOAD ALL
+══════════════════════════════════════ */
 async function loadAll() {
-  for (const p of PROJECTS) {
-    const d = await fbGet('cmds', p.id);
-    if (d && d.list) STATE.cmds[p.id] = d.list;
-  }
-  for (const p of PROJECTS) {
-    const d = await fbGet('notes', p.id);
-    if (d && d.text !== undefined) STATE.notes[p.id] = d.text;
-  }
-  // skrypty per projekt
-  STATE.scripts = {};
-  for (const p of PROJECTS) {
-    const d = await fbGet('scripts', p.id);
-    if (d && d.list) STATE.scripts[p.id] = d.list;
-  }
-  // Linki: jeśli Firebase puste → zapisz domyślne
+  // projekty
+  const pd = await fbGet('settings', 'projects');
+  STATE.projects = (pd && pd.list && pd.list.length > 0)
+    ? pd.list : DEFAULT_PROJECTS.map(p => ({...p}));
+  if (!pd || !pd.list || !pd.list.length)
+    await fbSet('settings', 'projects', {list: STATE.projects});
+
+  // linki
   const ld = await fbGet('settings', 'links');
-  if (ld && ld.list && ld.list.length > 0) {
-    STATE.links = ld.list;
-  } else {
-    STATE.links = DEFAULT_LINKS.map(l => ({...l}));
-    await fbSet('settings', 'links', { list: STATE.links });
+  STATE.links = (ld && ld.list && ld.list.length > 0)
+    ? ld.list : DEFAULT_LINKS.map(l => ({...l}));
+  if (!ld || !ld.list || !ld.list.length)
+    await fbSet('settings', 'links', {list: STATE.links});
+
+  // notatki i skrypty per projekt
+  for (const p of STATE.projects) {
+    const nd = await fbGet('notes', p.id);
+    if (nd && nd.text !== undefined) STATE.notes[p.id] = nd.text;
+    const sd = await fbGet('scripts', p.id);
+    if (sd && sd.list) STATE.scripts[p.id] = sd.list;
   }
+
+  // global
   const gd = await fbGet('settings', 'global');
   if (gd && gd.text !== undefined) STATE.global = gd.text;
 
+  renderProjects();
   renderLinks();
-  refreshOpenButtons();
   const gnp = document.getElementById('gnp');
   gnp.value = STATE.global; upGc();
 }
 
-function effCmds(pid) {
-  if (STATE.cmds[pid] !== undefined) return STATE.cmds[pid];
-  const p = PROJECTS.find(x => x.id === pid);
-  return p ? [...p.cmds] : [];
-}
-
-/* ══════════════════════════════════
-   AUTH
-══════════════════════════════════ */
-function googleLogin() {
-  const prov = new window._GoogleAuthProvider();
-  window._signInWithPopup(window._auth, prov).catch(e => toast('⚠️ ' + e.message));
-}
-function doLogout() {
-  window._signOut(window._auth);
-}
-
-/* ══════════════════════════════════
-   RENDER
-══════════════════════════════════ */
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function renderCmds(pid, cmds, el) {
-  el.innerHTML = '';
-  if (!cmds.length) { el.innerHTML = '<div class="empty-cmds">Brak komend — dodaj pierwszą ↗</div>'; return; }
-  cmds.forEach((cmd, i) => {
-    const row = document.createElement('div'); row.className = 'cmd-row';
-    row.innerHTML = `<div class="cmd-txt"><div class="cmd-name">${esc(cmd.n)}</div><div class="cmd-code">${esc(cmd.c)}</div></div>
-      <div class="cmd-acts">
-        <button class="btn-copy">KOPIUJ</button>
-        <button class="btn-del" title="Usuń">✕</button>
-      </div>`;
-    row.querySelector('.btn-copy').onclick = () => { navigator.clipboard.writeText(cmd.c); toast('✓ ' + cmd.n); };
-    row.querySelector('.btn-del').onclick  = () => {
-      const a = effCmds(pid); a.splice(i, 1);
-      STATE.cmds[pid] = a;
-      fbSet('cmds', pid, { list: a });
-      renderCmds(pid, a, el); toast('Usunięto komendę');
-    };
-    el.appendChild(row);
-  });
-}
-
-/* ══════════════════════════════════
-   SYNC — przycisk OTWÓRZ bierze URL z Firebase
-══════════════════════════════════ */
-function refreshOpenButtons() {
-  PROJECTS.forEach(proj => {
-    const btn = document.getElementById('open-btn-' + proj.id);
-    if (!btn) return;
-    // szukaj w STATE.links po id lub nazwie projektu
-    const lnk = STATE.links.find(l => l.id === proj.id || l.n === proj.name);
-    if (lnk && lnk.url) {
-      btn.href = lnk.url;
-      btn.style.opacity = '1';
-      btn.style.pointerEvents = 'auto';
-    } else {
-      btn.href = '#';
-      btn.style.opacity = '0.35';
-      btn.style.pointerEvents = 'none';
-      btn.title = 'Brak URL — ustaw go w zakładce Linki';
-    }
-  });
-}
-
-/* ══════════════════════════════════
-   RENDER LINKS
-══════════════════════════════════ */
-function renderLinks() {
-  // ── prawy panel: chipsy ──
-  const box = document.getElementById('other-chips');
-  if (box) {
-    box.innerHTML = '';
-    STATE.links.forEach((lnk, i) => {
-      const chip = document.createElement('span');
-      chip.className = 'chip-a';
-      chip.style.borderColor = lnk.c || 'rgba(0,229,255,.3)';
-      const a = document.createElement('a');
-      a.href = lnk.url || '#';
-      if (lnk.url) a.target = '_blank';
-      a.style.cssText = 'color:#fff;text-decoration:none;';
-      a.textContent = (lnk.i ? lnk.i + ' ' : '') + lnk.n;
-      chip.appendChild(a);
-      const del = document.createElement('button');
-      del.className = 'chip-del'; del.textContent = '✕'; del.title = 'Usuń';
-      del.onclick = (e) => { e.stopPropagation(); removeLink(i); };
-      chip.appendChild(del);
-      box.appendChild(chip);
-    });
-  }
-
-  // ── zakładka Linki: karty ──
-  const grid = document.getElementById('links-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  if (!STATE.links.length) {
-    grid.innerHTML = '<div class="links-empty">Brak projektów — dodaj pierwszy ↗</div>';
-    return;
-  }
-  STATE.links.forEach((lnk, i) => {
-    const hasUrl = lnk.url && lnk.url.length > 0;
-    const card = document.createElement('div'); card.className = 'link-card';
+/* ══════════════════════════════════════
+   RENDER PROJECTS LIST
+══════════════════════════════════════ */
+function renderProjects() {
+  const list = document.getElementById('projects-list');
+  list.innerHTML = '';
+  STATE.projects.forEach((proj, i) => {
+    const card = document.createElement('div');
+    card.className = 'proj-card' + (activePid === proj.id ? ' active' : '');
+    card.style.setProperty('--c', proj.color || '#00e5ff');
+    const tagMap = {vercel:'🌐 Vercel', vps:'⚙️ VPS', local:'📄 HTML'};
+    const tagClass = {vercel:'online', vps:'vps', local:'local'};
     card.innerHTML = `
-      <div class="link-card-left">
-        <div class="link-card-name">
-          <span class="link-card-dot" style="background:${lnk.c||'#00e5ff'};box-shadow:0 0 6px ${lnk.c||'#00e5ff'}40"></span>
-          <span>${lnk.i ? lnk.i + ' ' : ''}${esc(lnk.n)}</span>
-        </div>
-        ${lnk.desc ? `<div class="link-card-sub">${esc(lnk.desc)}</div>` : ''}
-        <div class="link-card-url">
-          ${hasUrl ? `<a href="${lnk.url}" target="_blank">${esc(lnk.url)}</a>`
-                   : '<span class="lc-novps">⚙️ VPS only — brak URL</span>'}
-        </div>
+      <div class="proj-card-icon">${proj.icon || '📦'}</div>
+      <div class="proj-card-info">
+        <div class="proj-card-name">${esc(proj.name)}</div>
+        <div class="proj-card-desc">${esc(proj.desc || '')}</div>
       </div>
-      <div class="link-card-actions">
-        ${hasUrl ? `<a href="${lnk.url}" target="_blank" class="lc-open">↗</a>` : ''}
-        <button class="lc-edit" title="Edytuj">✏️</button>
-        <button class="lc-del" title="Usuń">✕</button>
+      <span class="proj-card-tag ${tagClass[proj.type] || ''}">${tagMap[proj.type] || proj.type}</span>
+    `;
+    card.onclick = () => openDetail(proj.id);
+    list.appendChild(card);
+  });
+
+  // przycisk dodaj
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-proj-btn';
+  addBtn.innerHTML = '＋ Dodaj projekt';
+  addBtn.onclick = openAddProjectModal;
+  list.appendChild(addBtn);
+}
+
+/* ══════════════════════════════════════
+   DETAIL PANEL
+══════════════════════════════════════ */
+async function openDetail(pid) {
+  activePid = pid;
+  renderProjects(); // update active state
+
+  const proj = STATE.projects.find(p => p.id === pid);
+  if (!proj) return;
+
+  document.getElementById('detail-empty').style.display = 'none';
+  const dc = document.getElementById('detail-content');
+  dc.style.display = 'flex';
+
+  // top
+  document.getElementById('d-icon').textContent = proj.icon || '📦';
+  document.getElementById('d-name').textContent = proj.name;
+  document.getElementById('d-name').style.color = proj.color || '#fff';
+  document.getElementById('d-desc').textContent = proj.desc || '';
+  const openBtn = document.getElementById('d-open-btn');
+  if (proj.url) {
+    openBtn.href = proj.url;
+    openBtn.style.borderColor = proj.color || '#00e5ff';
+    openBtn.style.color = proj.color || '#00e5ff';
+    openBtn.style.opacity = '1'; openBtn.style.pointerEvents = 'auto';
+  } else {
+    openBtn.href = '#';
+    openBtn.style.opacity = '0.35'; openBtn.style.pointerEvents = 'none';
+    openBtn.style.borderColor = 'rgba(255,255,255,.2)';
+    openBtn.style.color = 'var(--muted)';
+  }
+
+  // stats
+  await renderStats(proj);
+
+  // notes
+  const ta = document.getElementById('d-note-ta');
+  ta.value = STATE.notes[pid] || '';
+  const ns = document.getElementById('d-note-status');
+  ns.textContent = 'Ctrl+S = zapisz'; ns.style.color = 'var(--muted)';
+  ta.oninput = () => {
+    STATE.notes[pid] = ta.value;
+    ns.textContent = '● niezapisane'; ns.style.color = 'var(--red)';
+    clearTimeout(saveTimer[pid]);
+    saveTimer[pid] = setTimeout(() => {
+      fbSet('notes', pid, {text: ta.value});
+      ns.textContent = '✓ auto-zapisano'; ns.style.color = 'var(--green)';
+    }, 1500);
+  };
+  ta.onkeydown = e => {
+    if (e.ctrlKey && e.key === 's') {
+      e.preventDefault();
+      clearTimeout(saveTimer[pid]);
+      fbSet('notes', pid, {text: ta.value});
+      ns.textContent = '✓ zapisano'; ns.style.color = 'var(--green)';
+      toast('✓ Notatki zapisane');
+    }
+  };
+
+  // scripts
+  document.getElementById('d-add-script-btn').onclick = () => openScriptModal(pid);
+  refreshScriptDropdown(pid);
+}
+
+/* ══════════════════════════════════════
+   STATYSTYKI
+══════════════════════════════════════ */
+async function renderStats(proj) {
+  const area = document.getElementById('d-stats-area');
+  area.innerHTML = '';
+
+  if (proj.id === 'xpost' && window._xpostDb) {
+    // XPost Manager — czyta z osobnego Firebase
+    area.innerHTML = `
+      <div class="stats-row">
+        <div class="stat-box loading"><div class="stat-val" id="s-all" style="color:#fff">…</div><div class="stat-label">Wszystkich</div></div>
+        <div class="stat-box loading"><div class="stat-val" id="s-new" style="color:var(--neon)">…</div><div class="stat-label">Nowych</div></div>
+        <div class="stat-box loading"><div class="stat-val" id="s-wip" style="color:var(--yellow)">…</div><div class="stat-label">W toku</div></div>
+        <div class="stat-box loading"><div class="stat-val" id="s-pub" style="color:var(--green)">…</div><div class="stat-label">Opublikowanych</div></div>
       </div>`;
-    card.querySelector('.lc-edit').onclick = () => openEditLinkModal(i);
-    card.querySelector('.lc-del').onclick  = () => removeLink(i);
-    grid.appendChild(card);
-  });
-  // sync przyciski OTWÓRZ w zakładkach projektów
-  refreshOpenButtons();
+    try {
+      const col = window._collection(window._xpostDb, 'posts');
+      const [all, nowe, wtoku, opubl] = await Promise.all([
+        window._getCountFromServer(col),
+        window._getCountFromServer(window._query(col, window._where('status','==','Nowe'))),
+        window._getCountFromServer(window._query(col, window._where('status','==','W toku'))),
+        window._getCountFromServer(window._query(col, window._where('status','==','Opublikowane'))),
+      ]);
+      document.getElementById('s-all').textContent = all.data().count;
+      document.getElementById('s-new').textContent = nowe.data().count;
+      document.getElementById('s-wip').textContent = wtoku.data().count;
+      document.getElementById('s-pub').textContent = opubl.data().count;
+      area.querySelectorAll('.stat-box').forEach(b => b.classList.remove('loading'));
+    } catch(e) {
+      area.innerHTML = `<div class="stats-none">⚠️ Błąd pobierania statystyk — sprawdź konfigurację Firebase XPost</div>`;
+      console.error('XPost stats error:', e);
+    }
+  } else if (proj.statsConfig) {
+    // przyszłe projekty — stats z własnego Firebase
+    area.innerHTML = `<div class="stats-none">📊 Statystyki skonfigurowane — pobieranie…</div>`;
+    // TODO: obsługa innych projektów
+  } else {
+    area.innerHTML = `<div class="stats-none">📊 Brak statystyk — skonfiguruj Firebase dla tego projektu</div>`;
+  }
 }
 
-function removeLink(i) {
-  if (!confirm(`Usunąć "${STATE.links[i].n}"?`)) return;
-  STATE.links.splice(i, 1);
-  fbSet('settings', 'links', { list: STATE.links });
-  renderLinks(); toast('Usunięto projekt');
-}
-
-function buildViews() {
-  const wrap = document.getElementById('views-wrap');
-  const tabs = document.getElementById('tabs-bar');
-  PROJECTS.forEach((proj) => {
-    // tab
-    const tab = document.createElement('button');
-    tab.className = 'tab-btn';
-    tab.dataset.pid = proj.id;
-    tab.innerHTML = `<span class="ti">${proj.icon}</span>${proj.name}`;
-    tab.onclick = () => switchTab(proj.id);
-    tabs.insertBefore(tab, document.getElementById('tab-links'));
-
-    // view container
-    const view = document.createElement('div');
-    view.className = 'pview';
-    view.id = 'pv-' + proj.id;
-
-    // ── top bar ──
-    const top = document.createElement('div'); top.className = 'pv-top';
-    top.innerHTML = `
-      <div class="pv-title">
-        <span class="pv-icon">${proj.icon}</span>
-        <div>
-          <div class="pv-name">${proj.name}</div>
-          <div class="pv-desc">${proj.desc}</div>
-        </div>
-      </div>
-      <a href="${proj.url || '#'}" target="_blank" class="pv-open" id="open-btn-${proj.id}" style="border-color:${proj.color};color:${proj.color}">↗ OTWÓRZ</a>`;
-    view.appendChild(top);
-
-    // ── main split ──
-    const split = document.createElement('div'); split.className = 'pv-split';
-
-    // ── top row: komendy + skrypty ──
-    const topRow = document.createElement('div'); topRow.className = 'pv-top-row';
-
-    // CMD panel
-    const cp = document.createElement('div'); cp.className = 'cmd-panel';
-    const cphdr = document.createElement('div'); cphdr.className = 'panel-hdr';
-    cphdr.innerHTML = `<span class="panel-hdr-l">⌨ KOMENDY VPS</span><button class="add-btn">+ DODAJ</button>`;
-    cphdr.querySelector('.add-btn').onclick = () => openCmdModal(proj.id);
-    const cs = document.createElement('div'); cs.className = 'cmd-scroll'; cs.id = 'cs-' + proj.id;
-    renderCmds(proj.id, effCmds(proj.id), cs);
-    cp.appendChild(cphdr); cp.appendChild(cs);
-    topRow.appendChild(cp);
-
-    // SCRIPT panel
-    const sp = document.createElement('div'); sp.className = 'script-panel';
-    const sphdr = document.createElement('div'); sphdr.className = 'panel-hdr';
-    sphdr.innerHTML = `<span class="panel-hdr-l">📜 SKRYPTY</span><button class="add-btn">+ DODAJ</button>`;
-    sphdr.querySelector('.add-btn').onclick = () => openScriptModal(proj.id);
-
-    // dropdown row
-    const selRow = document.createElement('div'); selRow.className = 'script-select-row';
-    const sel = document.createElement('select'); sel.className = 'script-dropdown'; sel.id = 'sd-' + proj.id;
-    sel.innerHTML = '<option value="">— wybierz skrypt —</option>';
-    const delSelBtn = document.createElement('button'); delSelBtn.className = 'script-del-sel'; delSelBtn.textContent = '✕'; delSelBtn.title = 'Usuń wybrany skrypt';
-    delSelBtn.onclick = () => deleteSelectedScript(proj.id);
-    selRow.appendChild(sel); selRow.appendChild(delSelBtn);
-
-    const sbody = document.createElement('div'); sbody.className = 'script-body'; sbody.id = 'sb-' + proj.id;
-    sbody.innerHTML = '<div class="script-empty">Wybierz skrypt z listy lub dodaj nowy ↗</div>';
-
-    sel.onchange = () => showScript(proj.id);
-
-    sp.appendChild(sphdr); sp.appendChild(selRow); sp.appendChild(sbody);
-    topRow.appendChild(sp);
-    split.appendChild(topRow);
-
-    // ── bottom: notatki (full width) ──
-    const np = document.createElement('div'); np.className = 'note-panel';
-    const nphdr = document.createElement('div'); nphdr.className = 'panel-hdr';
-    nphdr.innerHTML = `<span class="panel-hdr-l">📝 NOTATKI</span><span class="note-status" id="ns-${proj.id}">Ctrl+S = zapisz</span>`;
-    const ta = document.createElement('textarea'); ta.className = 'note-ta';
-    ta.placeholder = `// Notatki dla ${proj.name}...\n// URL, tokeny, uwagi, IP, logi...`;
-    ta.value = STATE.notes[proj.id] || '';
-    ta.oninput = () => {
-      STATE.notes[proj.id] = ta.value;
-      const b = document.getElementById('ns-' + proj.id);
-      b.textContent = '● niezapisane'; b.style.color = 'var(--red)';
-      clearTimeout(saveTimer[proj.id]);
-      saveTimer[proj.id] = setTimeout(() => {
-        fbSet('notes', proj.id, { text: ta.value });
-        b.textContent = '✓ auto-zapisano'; b.style.color = 'var(--green)';
-      }, 1500);
-    };
-    ta.onkeydown = e => { if (e.ctrlKey && e.key === 's') { e.preventDefault(); clearTimeout(saveTimer[proj.id]); fbSet('notes', proj.id, { text: ta.value }); const b = document.getElementById('ns-' + proj.id); b.textContent = '✓ zapisano'; b.style.color = 'var(--green)'; toast('✓ Notatki zapisane'); } };
-    np.appendChild(nphdr); np.appendChild(ta);
-    split.appendChild(np);
-
-    view.appendChild(split);
-    wrap.insertBefore(view, document.getElementById('pv-__links__'));
-  });
-
-  switchTab(PROJECTS[0].id);
-}
-
-function switchTab(pid) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pid === pid || (pid === '__links__' && b.id === 'tab-links')));
-  document.querySelectorAll('.pview').forEach(v => v.classList.toggle('active', v.id === 'pv-' + pid));
-  document.querySelectorAll('.links-view').forEach(v => v.classList.toggle('active', pid === '__links__'));
-}
-
-/* ══════════════════════════════════
-   MODALS
-══════════════════════════════════ */
-/* ══════════════════════════════════
+/* ══════════════════════════════════════
    SKRYPTY
-══════════════════════════════════ */
-function effScripts(pid) {
-  return STATE.scripts && STATE.scripts[pid] ? STATE.scripts[pid] : [];
-}
+══════════════════════════════════════ */
+function getScripts(pid) { return STATE.scripts[pid] || []; }
 
 function refreshScriptDropdown(pid) {
-  const sel = document.getElementById('sd-' + pid);
+  const sel = document.getElementById('d-script-sel');
   if (!sel) return;
-  const scripts = effScripts(pid);
+  const scripts = getScripts(pid);
   const prev = sel.value;
   sel.innerHTML = '<option value="">— wybierz skrypt —</option>';
   scripts.forEach((s, i) => {
@@ -927,186 +874,260 @@ function refreshScriptDropdown(pid) {
     opt.value = i; opt.textContent = s.n;
     sel.appendChild(opt);
   });
-  // przywróć zaznaczenie jeśli możliwe
   if (prev !== '' && scripts[prev]) sel.value = prev;
-  showScript(pid);
+  showDetailScript();
 }
 
-function showScript(pid) {
-  const sel = document.getElementById('sd-' + pid);
-  const body = document.getElementById('sb-' + pid);
-  if (!sel || !body) return;
-  const scripts = effScripts(pid);
+function showDetailScript() {
+  const sel = document.getElementById('d-script-sel');
+  const body = document.getElementById('d-script-body');
+  const scripts = getScripts(activePid);
   const idx = parseInt(sel.value);
   if (isNaN(idx) || !scripts[idx]) {
-    body.innerHTML = '<div class="script-empty">Wybierz skrypt z listy lub dodaj nowy ↗</div>';
+    body.innerHTML = '<div class="script-empty">Wybierz skrypt lub dodaj nowy ↗</div>';
     return;
   }
   const s = scripts[idx];
   body.innerHTML = `
     <div class="script-name">${esc(s.n)}</div>
     <div class="script-instructions">${esc(s.body)}</div>
-    <button class="script-copy-btn" onclick="copyScript('${pid}',${idx})">📋 KOPIUJ INSTRUKCJĘ</button>`;
+    <button class="script-copy-btn" onclick="navigator.clipboard.writeText(${JSON.stringify(s.body)}).then(()=>toast('✓ Skopiowano'))">📋 KOPIUJ INSTRUKCJĘ</button>`;
 }
 
-function copyScript(pid, idx) {
-  const s = effScripts(pid)[idx];
-  if (!s) return;
-  navigator.clipboard.writeText(s.body);
-  toast('✓ Skopiowano: ' + s.n);
-}
-
-function deleteSelectedScript(pid) {
-  const sel = document.getElementById('sd-' + pid);
+function deleteDetailScript() {
+  const sel = document.getElementById('d-script-sel');
   const idx = parseInt(sel.value);
   if (isNaN(idx)) { toast('⚠️ Najpierw wybierz skrypt'); return; }
-  const scripts = effScripts(pid);
-  if (!confirm(`Usunąć skrypt "${scripts[idx].n}"?`)) return;
+  const scripts = getScripts(activePid);
+  if (!confirm(`Usunąć "${scripts[idx].n}"?`)) return;
   scripts.splice(idx, 1);
-  if (!STATE.scripts) STATE.scripts = {};
-  STATE.scripts[pid] = scripts;
-  fbSet('scripts', pid, { list: scripts });
-  refreshScriptDropdown(pid);
+  STATE.scripts[activePid] = scripts;
+  fbSet('scripts', activePid, {list: scripts});
+  refreshScriptDropdown(activePid);
   toast('Usunięto skrypt');
 }
 
-let scriptPid = null;
 function openScriptModal(pid) {
-  scriptPid = pid;
+  scriptTargetPid = pid;
   document.getElementById('sm-n').value = '';
   document.getElementById('sm-b').value = '';
   document.getElementById('modal-script').classList.add('open');
   setTimeout(() => document.getElementById('sm-n').focus(), 50);
 }
+
 function saveScript() {
   const n = document.getElementById('sm-n').value.trim();
   const b = document.getElementById('sm-b').value.trim();
   if (!n) { toast('⚠️ Wpisz nazwę skryptu'); return; }
-  if (!STATE.scripts) STATE.scripts = {};
-  if (!STATE.scripts[scriptPid]) STATE.scripts[scriptPid] = [];
-  STATE.scripts[scriptPid].push({ n, body: b });
-  fbSet('scripts', scriptPid, { list: STATE.scripts[scriptPid] });
-  refreshScriptDropdown(scriptPid);
+  if (!STATE.scripts[scriptTargetPid]) STATE.scripts[scriptTargetPid] = [];
+  STATE.scripts[scriptTargetPid].push({n, body: b});
+  fbSet('scripts', scriptTargetPid, {list: STATE.scripts[scriptTargetPid]});
+  refreshScriptDropdown(scriptTargetPid);
   closeModal('modal-script');
   toast('✓ Dodano skrypt: ' + n);
 }
 
-let mPid = null;
-function openCmdModal(pid) {
-  mPid = pid;
-  document.getElementById('mn').value = '';
-  document.getElementById('mc').value = '';
-  document.getElementById('modal-cmd').classList.add('open');
-  setTimeout(() => document.getElementById('mn').focus(), 50);
+/* ══════════════════════════════════════
+   PROJEKTY — MODAL DODAJ/EDYTUJ
+══════════════════════════════════════ */
+function openAddProjectModal() {
+  editProjIdx = null;
+  document.getElementById('mp-title').textContent = '➕ Dodaj projekt';
+  document.getElementById('mp-name').value  = '';
+  document.getElementById('mp-icon').value  = '';
+  document.getElementById('mp-desc').value  = '';
+  document.getElementById('mp-url').value   = '';
+  document.getElementById('mp-color').value = '#00e5ff';
+  document.getElementById('mp-type').value  = 'vercel';
+  document.getElementById('modal-proj').classList.add('open');
+  setTimeout(() => document.getElementById('mp-name').focus(), 50);
 }
-/* ══════════════════════════════════
-   LINK MODAL — dodaj i edytuj
-══════════════════════════════════ */
-let editLinkIdx = null;
 
+function editCurrentProject() {
+  const proj = STATE.projects.find(p => p.id === activePid);
+  if (!proj) return;
+  editProjIdx = STATE.projects.indexOf(proj);
+  document.getElementById('mp-title').textContent = '✏️ Edytuj projekt';
+  document.getElementById('mp-name').value  = proj.name  || '';
+  document.getElementById('mp-icon').value  = proj.icon  || '';
+  document.getElementById('mp-desc').value  = proj.desc  || '';
+  document.getElementById('mp-url').value   = proj.url   || '';
+  document.getElementById('mp-color').value = proj.color || '#00e5ff';
+  document.getElementById('mp-type').value  = proj.type  || 'vercel';
+  document.getElementById('modal-proj').classList.add('open');
+}
+
+function saveProject() {
+  const name  = document.getElementById('mp-name').value.trim();
+  const icon  = document.getElementById('mp-icon').value.trim() || '📦';
+  const desc  = document.getElementById('mp-desc').value.trim();
+  const url   = document.getElementById('mp-url').value.trim();
+  const color = document.getElementById('mp-color').value.trim() || '#00e5ff';
+  const type  = document.getElementById('mp-type').value;
+  if (!name) { toast('⚠️ Wpisz nazwę projektu'); return; }
+
+  if (editProjIdx !== null) {
+    // edycja
+    const proj = STATE.projects[editProjIdx];
+    STATE.projects[editProjIdx] = {...proj, name, icon, desc, url, color, type};
+    toast('✓ Zaktualizowano: ' + name);
+    activePid = STATE.projects[editProjIdx].id;
+  } else {
+    // nowy
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
+    STATE.projects.push({id, name, icon, desc, url, color, type});
+    activePid = id;
+    toast('✓ Dodano projekt: ' + name);
+  }
+  fbSet('settings', 'projects', {list: STATE.projects});
+  closeModal('modal-proj');
+  renderProjects();
+  // odśwież panel jeśli edytowaliśmy aktywny projekt
+  openDetail(activePid);
+}
+
+/* ══════════════════════════════════════
+   LINKI — MODAL DODAJ/EDYTUJ
+══════════════════════════════════════ */
 function openLinkModal() {
   editLinkIdx = null;
-  document.getElementById('lm-title').textContent = '➕ Dodaj projekt / link';
+  document.getElementById('lm-title').textContent = '➕ Dodaj link';
   document.getElementById('ln').value = '';
   document.getElementById('lu').value = '';
+  document.getElementById('ld').value = '';
   document.getElementById('li').value = '';
   document.getElementById('lc').value = '#ffd740';
-  document.getElementById('ld').value = '';
   document.getElementById('modal-link').classList.add('open');
   setTimeout(() => document.getElementById('ln').focus(), 50);
 }
-
 function openEditLinkModal(i) {
   editLinkIdx = i;
-  const lnk = STATE.links[i];
-  document.getElementById('lm-title').textContent = '✏️ Edytuj projekt';
-  document.getElementById('ln').value = lnk.n   || '';
-  document.getElementById('lu').value = lnk.url || '';
-  document.getElementById('li').value = lnk.i   || '';
-  document.getElementById('lc').value = lnk.c   || '#ffd740';
-  document.getElementById('ld').value = lnk.desc|| '';
+  const l = STATE.links[i];
+  document.getElementById('lm-title').textContent = '✏️ Edytuj link';
+  document.getElementById('ln').value = l.n    || '';
+  document.getElementById('lu').value = l.url  || '';
+  document.getElementById('ld').value = l.desc || '';
+  document.getElementById('li').value = l.i    || '';
+  document.getElementById('lc').value = l.c    || '#ffd740';
   document.getElementById('modal-link').classList.add('open');
-  setTimeout(() => document.getElementById('ln').focus(), 50);
 }
-
 function saveLinkModal() {
   const n = document.getElementById('ln').value.trim();
   const u = document.getElementById('lu').value.trim();
+  const d = document.getElementById('ld').value.trim();
   const i = document.getElementById('li').value.trim();
   const c = document.getElementById('lc').value.trim() || '#ffd740';
-  const d = document.getElementById('ld').value.trim();
-  if (!n) { toast('⚠️ Wpisz nazwę projektu'); return; }
+  if (!n) { toast('⚠️ Wpisz nazwę'); return; }
   if (editLinkIdx !== null) {
-    STATE.links[editLinkIdx] = { ...STATE.links[editLinkIdx], n, url: u, i, c, desc: d };
+    STATE.links[editLinkIdx] = {...STATE.links[editLinkIdx], n, url:u, desc:d, i, c};
     toast('✓ Zaktualizowano: ' + n);
   } else {
-    const id = n.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
-    STATE.links.push({ id, n, url: u, i, c, desc: d });
+    STATE.links.push({id:'lnk_'+Date.now(), n, url:u, desc:d, i, c});
     toast('✓ Dodano: ' + n);
   }
-  fbSet('settings', 'links', { list: STATE.links });
+  fbSet('settings', 'links', {list: STATE.links});
   renderLinks();
   closeModal('modal-link');
 }
-
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-
-function addCmd() {
-  const n = document.getElementById('mn').value.trim();
-  const c = document.getElementById('mc').value.trim();
-  if (!n || !c) { toast('⚠️ Wpisz nazwę i komendę'); return; }
-  const a = effCmds(mPid); a.push({ n, c });
-  STATE.cmds[mPid] = a;
-  fbSet('cmds', mPid, { list: a });
-  renderCmds(mPid, a, document.getElementById('cs-' + mPid));
-  closeModal('modal-cmd'); toast('✓ Dodano: ' + n);
+function removeLink(i) {
+  if (!confirm(`Usunąć "${STATE.links[i].n}"?`)) return;
+  STATE.links.splice(i,1);
+  fbSet('settings', 'links', {list: STATE.links});
+  renderLinks(); toast('Usunięto');
 }
 
+function renderLinks() {
+  const grid = document.getElementById('links-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  if (!STATE.links.length) {
+    grid.innerHTML = '<div class="links-empty">Brak linków — dodaj pierwszy ↗</div>';
+    return;
+  }
+  STATE.links.forEach((l, i) => {
+    const hasUrl = l.url && l.url.length > 0;
+    const card = document.createElement('div'); card.className = 'link-card';
+    card.innerHTML = `
+      <div class="link-card-left">
+        <div class="link-card-name">
+          <span class="link-card-dot" style="background:${l.c||'#00e5ff'}"></span>
+          ${l.i ? l.i+' ' : ''}${esc(l.n)}
+        </div>
+        ${l.desc ? `<div class="link-card-sub">${esc(l.desc)}</div>` : ''}
+        <div class="link-card-url">
+          ${hasUrl ? `<a href="${l.url}" target="_blank">${esc(l.url)}</a>`
+                   : '<span class="lc-novps">⚙️ VPS / brak URL</span>'}
+        </div>
+      </div>
+      <div class="link-card-actions">
+        ${hasUrl ? `<a href="${l.url}" target="_blank" class="lc-open">↗</a>` : ''}
+        <button class="lc-edit">✏️</button>
+        <button class="lc-del">✕</button>
+      </div>`;
+    card.querySelector('.lc-edit').onclick = () => openEditLinkModal(i);
+    card.querySelector('.lc-del').onclick  = () => removeLink(i);
+    grid.appendChild(card);
+  });
+}
+
+/* ══════════════════════════════════════
+   TABS
+══════════════════════════════════════ */
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + tab));
+}
+
+/* ══════════════════════════════════════
+   MODAL HELPERS
+══════════════════════════════════════ */
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.ov').forEach(ov => ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); }));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.ov.open').forEach(o => o.classList.remove('open')); });
-document.getElementById('mn').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('mc').focus(); } });
 
-/* ══════════════════════════════════
+/* ══════════════════════════════════════
+   AUTH
+══════════════════════════════════════ */
+function googleLogin() {
+  const prov = new window._GoogleAuthProvider();
+  window._signInWithPopup(window._auth, prov).catch(e => toast('⚠️ ' + e.message));
+}
+function doLogout() { window._signOut(window._auth); }
+
+/* ══════════════════════════════════════
    GLOBAL NOTE
-══════════════════════════════════ */
+══════════════════════════════════════ */
 const gnp = document.getElementById('gnp');
 const gc  = document.getElementById('gc');
 let gTimer;
 gnp.oninput = () => { STATE.global = gnp.value; upGc(); clearTimeout(gTimer); gTimer = setTimeout(() => fbSet('settings','global',{text:gnp.value}), 1500); };
-gnp.onkeydown = e => { if (e.ctrlKey && e.key === 's') { e.preventDefault(); clearTimeout(gTimer); fbSet('settings','global',{text:gnp.value}); toast('✓ Notatki globalne zapisane'); } };
+gnp.onkeydown = e => { if (e.ctrlKey && e.key==='s') { e.preventDefault(); clearTimeout(gTimer); fbSet('settings','global',{text:gnp.value}); toast('✓ Zapisano'); } };
 function upGc() { gc.textContent = gnp.value.length + ' znaków'; }
-function svG() { clearTimeout(gTimer); fbSet('settings','global',{text:gnp.value}); toast('✓ Zapisano'); }
-function cpG() { navigator.clipboard.writeText(gnp.value).then(() => toast('✓ Skopiowano do schowka')); }
+function svG() { clearTimeout(gTimer); fbSet('settings','global',{text:gnp.value}); toast('✓ Zapisano notatki'); }
+function cpG() { navigator.clipboard.writeText(gnp.value).then(() => toast('✓ Skopiowano')); }
 
-/* ══════════════════════════════════
+/* ══════════════════════════════════════
    CLOCK
-══════════════════════════════════ */
+══════════════════════════════════════ */
 function upClock() {
   const n = new Date();
-  document.getElementById('clock').textContent = n.toLocaleTimeString('pl-PL', { hour12: false });
-  document.getElementById('dstr').textContent  = n.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'short' });
+  document.getElementById('clock').textContent = n.toLocaleTimeString('pl-PL',{hour12:false});
+  document.getElementById('dstr').textContent  = n.toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'short'});
 }
 upClock(); setInterval(upClock, 1000);
 
-/* ══════════════════════════════════
+/* ══════════════════════════════════════
    TOAST
-══════════════════════════════════ */
+══════════════════════════════════════ */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 let toastT;
-function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2400); }
+function toast(msg) { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),2400); }
 
-/* ══════════════════════════════════
-   INIT (called after login)
-══════════════════════════════════ */
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
 window.initApp = async function() {
-  buildViews();
   await loadAll();
-  PROJECTS.forEach(p => {
-    const ta = document.querySelector(`#pv-${p.id} .note-ta`);
-    if (ta) ta.value = STATE.notes[p.id] || '';
-    const cs = document.getElementById('cs-' + p.id);
-    if (cs) renderCmds(p.id, effCmds(p.id), cs);
-    refreshScriptDropdown(p.id);
-  });
 };
 </script>
 </body>
