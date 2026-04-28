@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generator Sprawozdań Kuratorskich</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #161b27;
+    --surface2: #1e2535;
+    --border: #2a3448;
+    --border-active: #4a6fa5;
+    --accent: #5b8dd9;
+    --text: #d8e0ef;
+    --text-muted: #6b7a99;
+    --text-dim: #3d4f6e;
+    --success: #4caf88;
+    --warn: #e8a94a;
+    --error: #e05c6e;
+    --label: #8fa8d0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: 17px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 10%, rgba(91,141,217,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 90%, rgba(76,175,136,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  header {
+    margin-bottom: 44px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .header-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-tag::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: #e8eef8;
+    margin-bottom: 8px;
+  }
+
+  h1 em { font-style: italic; color: var(--accent); }
+
+  .header-sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 300;
+  }
+
+  .save-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .save-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    min-width: 130px;
+    text-align: right;
+    transition: color 0.3s;
+  }
+
+  .save-status.ok { color: var(--success); }
+  .save-status.warn { color: var(--warn); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-muted);
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-save {
+    background: rgba(91,141,217,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-save:hover { background: rgba(91,141,217,0.22); }
+
+  /* ── ENTRIES ── */
+  .section-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    gap: 12px;
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--label);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title .count {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 7px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .section-hint-text {
+    font-family: 'Crimson Pro', serif;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-dim);
+  }
+
+  #entries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .entry-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+
+  .entry-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding-top: 12px;
+    min-width: 22px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .entry-box {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .entry-box:focus-within {
+    border-color: var(--border-active);
+    box-shadow: 0 0 0 1px rgba(74,111,165,0.15);
+  }
+
+  .entry-box textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: vertical;
+    padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--text);
+    min-height: 68px;
+    caret-color: var(--accent);
+  }
+
+  .entry-box textarea::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+    font-family: 'Crimson Pro', serif;
+    font-size: 13px;
+  }
+
+  .entry-source-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 8px 12px 6px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.015);
+  }
+
+  .source-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 3px 9px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+
+  .source-tag:hover {
+    border-color: var(--src-color, var(--accent));
+    color: var(--src-color, var(--accent));
+  }
+
+  .source-tag.active {
+    border-color: var(--src-color, var(--accent));
+    color: var(--src-color, var(--accent));
+    background: color-mix(in srgb, var(--src-color, var(--accent)) 12%, transparent);
+    font-weight: 500;
+  }
+
+
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-dim);
+    padding: 10px 6px 0;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+
+  .entry-del:hover { color: var(--error); }
+
+  .add-entry-btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 32px;
+  }
+
+  .add-entry-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(91,141,217,0.04);
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 0 22px;
+  }
+
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+
+  .divider-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* ── SPRAWOZDANIA ── */
+  .reports-hint {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: rgba(91,141,217,0.05);
+    border: 1px solid rgba(91,141,217,0.15);
+    border-radius: 6px;
+    line-height: 1.5;
+  }
+
+  .reports-hint strong { color: var(--accent); font-weight: 400; }
+
+  #reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+
+  .report-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .report-block:focus-within { border-color: var(--border-active); }
+
+  .report-block-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .report-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    min-width: 22px;
+  }
+
+  .report-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    flex: 1;
+  }
+
+  .report-file-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    font-style: normal;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .report-file-status.ok { color: var(--success); }
+  .report-file-status.err { color: var(--error); }
+  .report-file-status.loading { color: var(--warn); }
+
+  .report-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+
+  .report-upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .report-block textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: vertical;
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 1.65;
+    color: var(--text);
+    min-height: 160px;
+    caret-color: var(--accent);
+  }
+
+  .report-block textarea::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+    font-family: 'Crimson Pro', serif;
+    font-size: 13px;
+  }
+
+  .report-del {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: color 0.12s;
+    flex-shrink: 0;
+  }
+
+  .report-del:hover { color: var(--error); }
+
+  .add-report-btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 32px;
+  }
+
+  .add-report-btn:hover { border-color: var(--success); color: var(--success); background: rgba(76,175,136,0.04); }
+  .add-report-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+
+
+  textarea::-webkit-scrollbar { width: 4px; }
+  textarea::-webkit-scrollbar-track { background: transparent; }
+  textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── ACTIONS ── */
+  .actions-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .action-btn {
+    padding: 15px 24px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .action-btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .action-btn-primary:hover {
+    background: #6b9ee8;
+    box-shadow: 0 4px 20px rgba(91,141,217,0.35);
+    transform: translateY(-1px);
+  }
+
+  .action-btn-primary:active { transform: translateY(0); }
+
+  .action-btn-primary:disabled {
+    background: var(--surface2);
+    color: var(--text-dim);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .action-btn-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .action-btn-secondary:hover {
+    border-color: var(--warn);
+    color: var(--warn);
+    background: rgba(232,169,74,0.06);
+  }
+
+  .spinner {
+    display: none;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  .spinner.active { display: block; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── ERROR ── */
+  .error-block {
+    display: none;
+    background: rgba(224,92,110,0.08);
+    border: 1px solid rgba(224,92,110,0.3);
+    border-radius: 6px;
+    padding: 12px 16px;
+    color: var(--error);
+    margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  .error-block.visible { display: block; }
+
+  /* ── RESULT ── */
+  .result-block {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--success);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(76,175,136,0.08), 0 8px 32px rgba(0,0,0,0.4);
+    margin-bottom: 28px;
+  }
+
+  .result-block.visible { display: block; }
+
+  .result-header {
+    padding: 12px 20px;
+    background: rgba(76,175,136,0.07);
+    border-bottom: 1px solid rgba(76,175,136,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .result-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .result-title::before { content: '✓'; font-size: 12px; }
+
+  .copy-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { border-color: var(--success); color: var(--success); }
+  .copy-btn.copied { border-color: var(--success); color: var(--success); background: rgba(76,175,136,0.08); }
+
+  #result-text {
+    padding: 22px 20px;
+    font-family: 'Crimson Pro', serif;
+    font-size: 16px;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    color: var(--text);
+    min-height: 100px;
+    max-height: 580px;
+    overflow-y: auto;
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.visible { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 100%;
+    max-width: 740px;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    animation: modalIn 0.2s ease;
+  }
+
+  @keyframes modalIn { from { opacity:0; transform:scale(0.97) translateY(8px); } to { opacity:1; transform:none; } }
+
+  .modal-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .modal-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--warn);
+  }
+
+  .modal-close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 22px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 22px;
+  }
+
+  .modal-body::-webkit-scrollbar { width: 4px; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  #prompt-preview {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .modal-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .footer-brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .footer-note { font-size: 13px; color: var(--text-dim); font-style: italic; }
+
+  @media (max-width: 680px) {
+    .actions-row { grid-template-columns: 1fr; }
+    h1 { font-size: 26px; }
+    .wrapper { padding: 28px 18px 60px; }
+    header { flex-direction: column; align-items: flex-start; }
+    .save-status { min-width: auto; text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div>
+      <div class="header-tag">Narzędzie kuratorskie</div>
+      <h1>Generator <em>sprawozdań</em><br>z nadzoru kuratorskiego</h1>
+      <p class="header-sub">Wklejaj wpisy od najstarszego do najnowszego — aplikacja zachowa kolejność.</p>
+    </div>
+    <div class="save-bar">
+      <span class="save-status" id="save-status">—</span>
+      <button class="btn btn-ghost" onclick="clearAll()">✕ Wyczyść</button>
+      <button class="btn btn-save" onclick="saveData()">💾 Zapisz</button>
+    </div>
+  </header>
+
+  <!-- ENTRIES -->
+  <div class="section-label-row">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <span class="section-title">
+        Wpisy z karty czynności
+        <span class="count" id="entry-count">0</span>
+      </span>
+      <span class="section-hint-text">Wpis 1 = najstarszy, ostatni = najnowszy</span>
+    </div>
+  </div>
+
+  <div id="entries-list"></div>
+  <button class="add-entry-btn" onclick="addEntry()">+ Dodaj kolejny wpis</button>
+
+  <!-- WZORCOWE -->
+  <div class="divider">
+    <div class="divider-line"></div>
+    <div class="divider-text">Wzorcowe sprawozdania</div>
+    <div class="divider-line"></div>
+  </div>
+
+  <div class="reports-hint">
+    Wgraj plik <strong>.docx</strong> — aplikacja automatycznie wyciągnie punkt&nbsp;2. sprawozdania. Możesz też wkleić treść ręcznie. Wymagane minimum 2 sprawozdania.
+  </div>
+
+  <div id="reports-list"></div>
+  <button class="add-report-btn" id="add-report-btn" onclick="addReport()">+ Dodaj sprawozdanie wzorcowe</button>
+
+  <div class="error-block" id="error-block"></div>
+
+  <div class="actions-row">
+    <button class="action-btn action-btn-primary" id="generate-btn" onclick="generateReport()">
+      <div class="spinner" id="spinner"></div>
+      <span id="btn-text">Generuj sprawozdanie</span>
+    </button>
+    <button class="action-btn action-btn-secondary" onclick="showPrompt()">
+      📋 Pokaż / skopiuj prompt
+    </button>
+  </div>
+
+  <div class="result-block" id="result-block">
+    <div class="result-header">
+      <span class="result-title">Sprawozdanie wygenerowane</span>
+      <button class="copy-btn" id="copy-btn" onclick="copyResult()">Kopiuj</button>
+    </div>
+    <div id="result-text"></div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">kurator.ai · v2.2</span>
+    <span class="footer-note">Treść należy zweryfikować przed złożeniem w sądzie.</span>
+  </footer>
+
+</div>
+
+<!-- PROMPT MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">📋 Wygenerowany prompt</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <pre id="prompt-preview"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Zamknij</button>
+      <button class="btn btn-save" id="copy-prompt-btn" onclick="copyPrompt()">📋 Kopiuj prompt</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script>
+  const STORAGE_KEY = 'kurator_v2';
+  let entries = [];
+
+  function showError(msg) {
+    const el = document.getElementById('error-block');
+    el.textContent = msg;
+    el.className = 'error-block visible';
+    setTimeout(() => { el.className = 'error-block'; }, 4000);
+  }
+
+  const SOURCE_TYPES = [
+    { value: 'wizyta',    label: 'Wizyta',           color: '#5b8dd9' },
+    { value: 'szkola',    label: 'Szkoła',            color: '#4caf88' },
+    { value: 'gmina',     label: 'Gmina / GOPS',      color: '#e8a94a' },
+    { value: 'policja',   label: 'Policja',           color: '#e05c6e' },
+    { value: 'asystent',  label: 'Asystent rodziny',  color: '#a78bfa' },
+    { value: 'wopit',     label: 'WOPiTU',            color: '#38bdf8' },
+  ];
+
+  function addEntry(value = '', source = 'wizyta') {
+    const id = Date.now() + Math.random();
+    entries.push({ id, value, source });
+    renderEntries();
+  }
+
+  function removeEntry(id) {
+    entries = entries.filter(e => e.id !== id);
+    renderEntries();
+  }
+
+  function renderEntries() {
+    const list = document.getElementById('entries-list');
+    list.innerHTML = '';
+    entries.forEach((entry, i) => {
+      const row = document.createElement('div');
+      row.className = 'entry-row';
+
+      const numEl = document.createElement('span');
+      numEl.className = 'entry-num';
+      numEl.textContent = String(i + 1).padStart(2, '0');
+
+      const box = document.createElement('div');
+      box.className = 'entry-box';
+
+      // Source selector bar
+      const sourceBar = document.createElement('div');
+      sourceBar.className = 'entry-source-bar';
+
+      SOURCE_TYPES.forEach(src => {
+        const btn = document.createElement('button');
+        btn.className = 'source-tag' + (entry.source === src.value ? ' active' : '');
+        btn.textContent = src.label;
+        btn.style.setProperty('--src-color', src.color);
+        btn.onclick = () => {
+          const e = entries.find(x => x.id === entry.id);
+          if (e) e.source = src.value;
+          renderEntries();
+        };
+        sourceBar.appendChild(btn);
+      });
+
+      const ta = document.createElement('textarea');
+      ta.rows = 3;
+      ta.placeholder = 'Wpis ' + (i + 1) + ' — wklej treść wpisu z karty czynności...';
+      ta.value = entry.value;
+      ta.addEventListener('input', () => {
+        const e = entries.find(x => x.id === entry.id);
+        if (e) e.value = ta.value;
+        updateCount();
+      });
+
+      const del = document.createElement('button');
+      del.className = 'entry-del';
+      del.title = 'Usuń wpis';
+      del.textContent = '×';
+      del.onclick = () => removeEntry(entry.id);
+
+      box.appendChild(sourceBar);
+      box.appendChild(ta);
+      row.appendChild(numEl);
+      row.appendChild(box);
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+    updateCount();
+  }
+
+  function updateCount() {
+    document.getElementById('entry-count').textContent = entries.length;
+  }
+
+  // ── REPORTS SYSTEM ──
+  let reports = []; // [{id, value}]
+  const MAX_REPORTS = 5;
+
+  function addReport(value = '') {
+    if (reports.length >= MAX_REPORTS) return;
+    const id = Date.now() + Math.random();
+    reports.push({ id, value });
+    renderReports();
+  }
+
+  function removeReport(id) {
+    if (reports.length <= 2) { showError('Wymagane minimum 2 wzorcowe sprawozdania.'); return; }
+    reports = reports.filter(r => r.id !== id);
+    renderReports();
+  }
+
+  function renderReports() {
+    const list = document.getElementById('reports-list');
+    list.innerHTML = '';
+    reports.forEach((report, i) => {
+      const block = document.createElement('div');
+      block.className = 'report-block';
+
+      // Header
+      const hdr = document.createElement('div');
+      hdr.className = 'report-block-header';
+
+      const num = document.createElement('span');
+      num.className = 'report-num';
+      num.textContent = String(i + 1).padStart(2, '0');
+
+      const title = document.createElement('span');
+      title.className = 'report-title';
+      title.textContent = 'Sprawozdanie wzorcowe nr ' + (i + 1);
+
+      const status = document.createElement('span');
+      status.className = 'report-file-status';
+      status.id = 'rstat-' + report.id;
+
+      // Hidden file input
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.docx,.doc';
+      fileInput.style.display = 'none';
+      fileInput.id = 'rfile-' + report.id;
+      fileInput.addEventListener('change', () => handleDocxUpload(fileInput, report.id));
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.className = 'report-upload-btn';
+      uploadBtn.innerHTML = '📂 Wgraj .docx';
+      uploadBtn.onclick = () => fileInput.click();
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'report-del';
+      delBtn.title = 'Usuń sprawozdanie';
+      delBtn.textContent = '×';
+      delBtn.onclick = () => removeReport(report.id);
+
+      hdr.appendChild(num);
+      hdr.appendChild(title);
+      hdr.appendChild(status);
+      hdr.appendChild(uploadBtn);
+      hdr.appendChild(fileInput);
+      hdr.appendChild(delBtn);
+
+      // Textarea
+      const ta = document.createElement('textarea');
+      ta.placeholder = 'Wklej treść punktu 2. sprawozdania lub wgraj plik .docx powyżej...';
+      ta.value = report.value;
+      ta.rows = 8;
+      ta.id = 'rtarea-' + report.id;
+      ta.addEventListener('input', () => {
+        const r = reports.find(x => x.id === report.id);
+        if (r) r.value = ta.value;
+      });
+
+      block.appendChild(hdr);
+      block.appendChild(ta);
+      list.appendChild(block);
+    });
+
+    // Toggle add button
+    const addBtn = document.getElementById('add-report-btn');
+    if (addBtn) addBtn.disabled = reports.length >= MAX_REPORTS;
+  }
+
+  async function handleDocxUpload(fileInput, reportId) {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const statusEl = document.getElementById('rstat-' + reportId);
+    const taEl = document.getElementById('rtarea-' + reportId);
+
+    statusEl.className = 'report-file-status loading';
+    statusEl.textContent = '⏳ Wczytuję...';
+
+    try {
+      // Check mammoth availability
+      if (typeof mammoth === 'undefined') {
+        throw new Error('Biblioteka mammoth.js niedostępna — sprawdź połączenie z internetem przy pierwszym uruchomieniu.');
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      const fullText = result.value;
+
+      // Extract punkt 2
+      const extracted = extractPoint2(fullText);
+
+      const report = reports.find(r => r.id === reportId);
+      if (report) report.value = extracted;
+      taEl.value = extracted;
+
+      statusEl.className = 'report-file-status ok';
+      statusEl.textContent = '✓ ' + file.name;
+    } catch (err) {
+      statusEl.className = 'report-file-status err';
+      statusEl.textContent = '✗ Błąd: ' + err.message.substring(0, 40);
+    }
+
+    fileInput.value = '';
+  }
+
+  function extractPoint2(text) {
+    const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    // ── STRATEGIA 1: szukamy dokładnego nagłówka pkt 2 po słowie kluczowym ──
+    // Nagłówek zawsze zaczyna się od słów "Sytuacja wychowawcza"
+    const keywordStart = /sytuacja\s+wychowawcza/i;
+
+    // Koniec punktu 2 — nagłówek punktu 3
+    const keywordEnd = /sytuacja\s+szkolna|sytuacja\s+materialna|warunki\s+bytowe|warunki\s+mieszkaniowe|^[\s]*3[\.\)]\s+\S|^[\s]*III[\.\):\s]/im;
+
+    const startMatch = normalized.search(keywordStart);
+
+    if (startMatch !== -1) {
+      // Cofnij się do początku linii zawierającej nagłówek, żeby pominąć numer "2."
+      let lineStart = startMatch;
+      while (lineStart > 0 && normalized[lineStart - 1] !== '\n') lineStart--;
+
+      // Szukaj końca od pozycji startu
+      const textFromStart = normalized.slice(lineStart);
+      const endMatch = textFromStart.search(keywordEnd);
+
+      let extracted;
+      if (endMatch !== -1) {
+        // Cofnij do początku linii końcowej
+        let endLineStart = endMatch;
+        while (endLineStart > 0 && textFromStart[endLineStart - 1] !== '\n') endLineStart--;
+        extracted = textFromStart.slice(0, endLineStart).trim();
+      } else {
+        extracted = textFromStart.trim();
+      }
+
+      // Usuń linię nagłówkową (zawiera "Sytuacja wychowawcza w rodzinie...")
+      // bo to tylko tytuł sekcji, nie treść sprawozdania
+      extracted = extracted
+        .split('\n')
+        .filter((line, idx) => {
+          if (idx === 0 && keywordStart.test(line)) return false; // pomiń tytuł
+          return true;
+        })
+        .join('\n')
+        .trim();
+
+      return extracted;
+    }
+
+    // ── STRATEGIA 2 (fallback): szukamy "2." na początku linii ──
+    const lines = normalized.split('\n');
+    const startPat = /^[\s]*2[\.\)]\s+\S/;
+    const endPat   = /^[\s]*3[\.\)]\s+\S|^[\s]*III[\.\):\s]/;
+
+    let startLine = -1, endLine = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (startLine === -1 && startPat.test(lines[i])) { startLine = i; continue; }
+      if (startLine !== -1 && endPat.test(lines[i]))   { endLine = i; break; }
+    }
+
+    if (startLine !== -1) {
+      const slice = lines.slice(startLine, endLine !== -1 ? endLine : undefined);
+      // Usuń pierwszą linię jeśli to sam nagłówek (krótka linia z numerem)
+      const content = slice.slice(1).join('\n').trim() || slice.join('\n').trim();
+      return content;
+    }
+
+    // ── STRATEGIA 3: zwróć cały tekst z informacją ──
+    return '[Nie znaleziono punktu 2. — wklej treść ręcznie]\n\n' + normalized.trim().substring(0, 2000);
+  }
+
+
+
+  function buildPrompt() {
+    // Group entries by source, preserving chronological order within each group
+    const groups = {};
+    SOURCE_TYPES.forEach(s => { groups[s.value] = []; });
+    entries.forEach((e, i) => {
+      if (e.value.trim().length > 0) {
+        groups[e.source] = groups[e.source] || [];
+        groups[e.source].push({ idx: i + 1, text: e.value.trim() });
+      }
+    });
+
+    // Build structured data block
+    let activitiesBlock = '';
+    SOURCE_TYPES.forEach(src => {
+      const items = groups[src.value];
+      if (items && items.length > 0) {
+        activitiesBlock += '\n\n=== ' + src.label.toUpperCase() + ' ===\n';
+        items.forEach(item => {
+          activitiesBlock += '[Wpis ' + item.idx + '] ' + item.text + '\n';
+        });
+      }
+    });
+    activitiesBlock = activitiesBlock.trim();
+
+    // Determine which sources are present
+    const presentSources = SOURCE_TYPES.filter(s => groups[s.value] && groups[s.value].length > 0);
+    const sourceList = presentSources.map(s => s.label).join(', ');
+
+    let examples = '';
+    reports.forEach((r, i) => {
+      const txt = r.value.trim();
+      if (txt) examples += '\n\n--- SPRAWOZDANIE WZORCOWE ' + (i+1) + ' ---\n' + txt;
+    });
+
+    return 'Jesteś doświadczonym zawodowym kuratorem sądowym ds. rodzinnych i nieletnich z wieloletnim stażem. Twoje sprawozdania są profesjonalne, zwięzłe i zgodne z językiem urzędowym stosowanym w polskich sądach rejonowych.\n\nTwoim zadaniem jest napisanie sprawozdania z nadzoru kuratorskiego na podstawie wpisów z karty czynności.\n\nKLUCZOWA ZASADA — SYNTEZA WEDŁUG ŹRÓDEŁ:\nDane są pogrupowane według źródła informacji: ' + sourceList + '.\nStwórz sprawozdanie podzielone na bloki — jeden blok na każde obecne źródło (np. blok „Wizyta", blok „Szkoła", blok „Gmina / GOPS" itd.).\nW każdym bloku syntetycznie opisz informacje z WSZYSTKICH wpisów danego źródła — NIE opisuj każdego wpisu osobno, lecz połącz je w spójny, płynny opis sytuacji. Zachowaj ogólną chronologię zdarzeń wewnątrz bloku.\nNIE używaj sformułowań „podczas pierwszej wizyty", „podczas kolejnej wizyty", „następnie".\n\nPOZOSTAŁE ZASADY:\n- Wzoruj się ściśle na stylu, strukturze i języku wzorcowych sprawozdań poniżej.\n- Używaj bezosobowej, urzędowej formy (np. „ustalono", „stwierdzono", „podopieczny oświadczył", „rozmówczyni poinformowała", „pracownik poinformował").\n- Nie dodawaj informacji spoza dostarczonych danych.\n- Jeśli dane są niejasne lub niepełne, zaznacz: [brak informacji].' + examples + '\n\n--- DANE ŹRÓDŁOWE Z KARTY CZYNNOŚCI ---\n' + activitiesBlock + '\n\nNapisz kompletne, syntetyczne sprawozdanie podzielone na bloki według źródeł. Zwróć wyłącznie treść sprawozdania, bez nagłówków sekcji, bez żadnych komentarzy ani wstępów — bloki oddziel akapitami, tak jak w przykładach.';
+  }
+
+  function validate() {
+    const hasEntries = entries.some(e => e.value.trim().length > 0);
+    const filledReports = reports.filter(r => r.value.trim().length > 0);
+    if (!hasEntries) return '⚠ Dodaj przynajmniej jeden wpis z karty czynności.';
+    if (filledReports.length < 2) return '⚠ Wypełnij przynajmniej 2 wzorcowe sprawozdania.';
+    return null;
+  }
+
+  async function generateReport() {
+    const errorBlock = document.getElementById('error-block');
+    errorBlock.className = 'error-block';
+    const err = validate();
+    if (err) { errorBlock.textContent = err; errorBlock.className = 'error-block visible'; return; }
+
+    const btn = document.getElementById('generate-btn');
+    const spinner = document.getElementById('spinner');
+    const btnText = document.getElementById('btn-text');
+    const resultBlock = document.getElementById('result-block');
+    const resultText = document.getElementById('result-text');
+
+    btn.disabled = true;
+    spinner.className = 'spinner active';
+    btnText.textContent = 'Generowanie...';
+    resultBlock.className = 'result-block';
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: buildPrompt() }]
+        })
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.error?.message || 'HTTP ' + response.status);
+      }
+      const data = await response.json();
+      const text = data.content?.map(b => b.text || '').join('') || '';
+      resultText.textContent = text;
+      resultBlock.className = 'result-block visible';
+      resultBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch(e) {
+      errorBlock.textContent = '⚠ Błąd: ' + e.message;
+      errorBlock.className = 'error-block visible';
+    } finally {
+      btn.disabled = false;
+      spinner.className = 'spinner';
+      btnText.textContent = 'Generuj sprawozdanie';
+    }
+  }
+
+  function copyResult() {
+    const text = document.getElementById('result-text').textContent;
+    const btn = document.getElementById('copy-btn');
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Skopiowano ✓'; btn.className = 'copy-btn copied';
+      setTimeout(() => { btn.textContent = 'Kopiuj'; btn.className = 'copy-btn'; }, 2200);
+    });
+  }
+
+  function showPrompt() {
+    const errorBlock = document.getElementById('error-block');
+    errorBlock.className = 'error-block';
+    const err = validate();
+    if (err) { errorBlock.textContent = err; errorBlock.className = 'error-block visible'; return; }
+    document.getElementById('prompt-preview').textContent = buildPrompt();
+    document.getElementById('modal-overlay').className = 'modal-overlay visible';
+  }
+
+  function closeModal() { document.getElementById('modal-overlay').className = 'modal-overlay'; }
+  function closeModalOutside(e) { if (e.target.id === 'modal-overlay') closeModal(); }
+
+  function copyPrompt() {
+    const text = document.getElementById('prompt-preview').textContent;
+    const btn = document.getElementById('copy-prompt-btn');
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Skopiowano!';
+      setTimeout(() => { btn.textContent = '📋 Kopiuj prompt'; }, 2200);
+    });
+  }
+
+  function saveData() {
+    const data = {
+      entries: entries.map(e => ({ value: e.value, source: e.source || 'wizyta' })),
+      reports: reports.map(r => r.value),
+      savedAt: new Date().toLocaleString('pl-PL')
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const status = document.getElementById('save-status');
+    status.textContent = 'Zapisano ' + data.savedAt;
+    status.className = 'save-status ok';
+    setTimeout(() => { status.className = 'save-status'; }, 4000);
+  }
+
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { addEntry(); addReport(); addReport(); return; }
+      const data = JSON.parse(raw);
+
+      // Load entries
+      entries = [];
+      (data.entries || []).forEach(v => {
+        if (typeof v === 'string') {
+          entries.push({ id: Date.now() + Math.random(), value: v, source: 'wizyta' });
+        } else {
+          entries.push({ id: Date.now() + Math.random(), value: v.value || '', source: v.source || 'wizyta' });
+        }
+      });
+      if (entries.length === 0) entries.push({ id: Date.now(), value: '', source: 'wizyta' });
+      renderEntries();
+
+      // Load reports — support old format (report1/2/3) and new (reports array)
+      reports = [];
+      if (data.reports && data.reports.length > 0) {
+        data.reports.forEach(v => reports.push({ id: Date.now() + Math.random(), value: v || '' }));
+      } else {
+        // migrate from old format
+        ['report1','report2','report3'].forEach(key => {
+          if (data[key] !== undefined) reports.push({ id: Date.now() + Math.random(), value: data[key] || '' });
+        });
+      }
+      // Ensure at least 2 slots
+      while (reports.length < 2) reports.push({ id: Date.now() + Math.random(), value: '' });
+      renderReports();
+
+      const status = document.getElementById('save-status');
+      status.textContent = 'Wczytano: ' + (data.savedAt || '—');
+      status.className = 'save-status warn';
+      setTimeout(() => { status.className = 'save-status'; }, 4000);
+    } catch(e) { addEntry(); addReport(); addReport(); }
+  }
+
+  function clearAll() {
+    if (!confirm('Wyczyścić wszystkie pola? Niezapisane dane zostaną utracone.')) return;
+    entries = [];
+    addEntry();
+    reports = [];
+    addReport(); addReport();
+    document.getElementById('result-block').className = 'result-block';
+    document.getElementById('error-block').className = 'error-block';
+    const status = document.getElementById('save-status');
+    status.textContent = 'Wyczyszczono';
+    status.className = 'save-status';
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  loadData();
+</script>
+</body>
+</html>

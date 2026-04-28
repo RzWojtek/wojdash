@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>X Article Prompt Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #0e0e11;
+  --surface: #16161a;
+  --surface2: #1e1e24;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0f0f4;
+  --muted: #8888a0;
+  --accent: #7c6aff;
+  --accent2: #a89fff;
+  --accent-bg: rgba(124,106,255,0.12);
+  --green: #34d399;
+  --green-bg: rgba(52,211,153,0.1);
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  padding: 0 0 4rem;
+}
+
+/* HEADER */
+.header {
+  padding: 2.5rem 2rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.header-logo {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.header-text h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+.header-text p {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* LAYOUT */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+@media (max-width: 760px) {
+  .main { grid-template-columns: 1fr; padding: 1rem; }
+}
+
+/* CARD */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+}
+.card-title {
+  font-size: .7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+  margin-bottom: 1.1rem;
+}
+.card.full { grid-column: 1 / -1; }
+
+/* FORM ELEMENTS */
+.field { margin-bottom: 1rem; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-size: .75rem;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+input[type=text], select, textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: .875rem;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color .15s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+input[type=text]:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+}
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238888a0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.hint { font-size: .7rem; color: var(--muted); margin-top: 4px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 500px) { .row2 { grid-template-columns: 1fr; } }
+
+/* TOGGLES */
+.toggle-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tog {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .78rem;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  user-select: none;
+  font-family: var(--sans);
+}
+.tog::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.tog.on {
+  background: var(--accent-bg);
+  color: var(--accent2);
+  border-color: rgba(124,106,255,0.3);
+}
+.tog.on::before {
+  background: var(--accent);
+}
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.1rem 0;
+}
+
+/* OUTPUT */
+.output-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  font-family: var(--mono);
+  font-size: .75rem;
+  line-height: 1.8;
+  color: #b0b0c8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 120px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.output-box.empty { color: var(--muted); font-style: italic; font-family: var(--sans); font-size: .85rem; }
+
+/* BUTTONS */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.btn {
+  font-family: var(--sans);
+  font-size: .8rem;
+  font-weight: 500;
+  padding: 9px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text);
+  transition: background .15s, opacity .15s;
+}
+.btn:hover { background: var(--surface2); }
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+.btn.primary:hover { opacity: .88; }
+.btn.sm { padding: 7px 14px; }
+.feedback {
+  font-size: .75rem;
+  color: var(--green);
+  opacity: 0;
+  transition: opacity .25s;
+}
+.feedback.show { opacity: 1; }
+
+/* STEP BADGE */
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent2);
+  font-size: .65rem;
+  font-weight: 600;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.card-title-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.1rem;
+}
+.card-title-row .card-title { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">✦</div>
+  <div class="header-text">
+    <h1>X Article Prompt Builder</h1>
+    <p>Generate a ready-to-use AI prompt for writing X (Twitter) Articles from a project page</p>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT COLUMN -->
+  <div style="display:flex;flex-direction:column;gap:1.5rem;">
+
+    <div class="card">
+      <div class="card-title-row">
+        <span class="step">1</span>
+        <span class="card-title">Project details</span>
+      </div>
+      <div class="field">
+        <label>Project name</label>
+        <input type="text" id="proj-name" placeholder="e.g. CryptoQuests" />
+      </div>
+      <div class="field">
+        <label>Project URL (main site / docs)</label>
+        <input type="text" id="proj-url" placeholder="https://..." />
+      </div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label>Target audience</label>
+          <select id="audience">
+            <option value="crypto enthusiasts and DeFi users">Crypto enthusiasts & DeFi users</option>
+            <option value="Web3 developers and builders">Web3 developers & builders</option>
+            <option value="general tech-savvy readers curious about blockchain">Curious general public</option>
+            <option value="crypto investors and traders">Crypto investors & traders</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Article length</label>
+          <select id="length">
+            <option value="600–900 words">Short — 600–900 words</option>
+            <option value="900–1400 words" selected>Medium — 900–1400 words</option>
+            <option value="1400–2200 words">Long — 1400–2200 words</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-top:1rem;margin-bottom:0">
+        <label>Key topics to cover (optional, comma-separated)</label>
+        <input type="text" id="topics" placeholder="e.g. tokenomics, staking, roadmap, team" />
+        <div class="hint">Leave blank — AI will pick the best topics from the page</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title-row">
+        <span class="step">2</span>
+        <span class="card-title">Article sections</span>
+      </div>
+      <div class="toggle-grid" id="sec-row"></div>
+
+      <hr class="divider"/>
+
+      <div class="card-title" style="margin-bottom:.75rem;">Visual placeholders</div>
+      <div class="toggle-grid" id="vis-row"></div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div style="display:flex;flex-direction:column;gap:1.5rem;">
+
+    <div class="card" style="flex:1">
+      <div class="card-title-row">
+        <span class="step">3</span>
+        <span class="card-title">Generated prompt</span>
+      </div>
+      <div class="output-box empty" id="output">Fill in project details and click "Generate prompt" →</div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="generate()">Generate prompt</button>
+        <button class="btn" onclick="copyIt()">Copy</button>
+        <span class="feedback" id="fb">Copied!</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">How to use</div>
+      <div style="font-size:.8rem;color:var(--muted);line-height:1.8;">
+        <div style="margin-bottom:6px;">① Fill in project name + URL above</div>
+        <div style="margin-bottom:6px;">② Toggle the sections you want in the article</div>
+        <div style="margin-bottom:6px;">③ Click <strong style="color:var(--text)">Generate prompt</strong></div>
+        <div style="margin-bottom:6px;">④ Copy and paste into <strong style="color:var(--text)">Claude, ChatGPT or Gemini</strong></div>
+        <div>⑤ The AI visits the URL, reads all subpages, and writes the article</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+var SECTIONS = [
+  { val: 'hook',  label: 'Hook intro' },
+  { val: 'what',  label: 'What is it?' },
+  { val: 'how',   label: 'How it works' },
+  { val: 'why',   label: 'Why it matters' },
+  { val: 'token', label: 'Tokenomics' },
+  { val: 'road',  label: 'Roadmap' },
+  { val: 'comm',  label: 'Community' },
+  { val: 'cta',   label: 'Call to action' }
+];
+
+var VISUALS = [
+  { val: 'hero',    label: 'Hero image prompt' },
+  { val: 'diag',    label: 'Architecture diagram' },
+  { val: 'tchart',  label: 'Tokenomics chart' },
+  { val: 'screens', label: 'UI screenshots' }
+];
+
+function buildToggles(containerId, items) {
+  var container = document.getElementById(containerId);
+  container.innerHTML = '';
+  for (var i = 0; i < items.length; i++) {
+    (function(item) {
+      var btn = document.createElement('button');
+      btn.className = 'tog on';
+      btn.setAttribute('data-val', item.val);
+      btn.textContent = item.label;
+      btn.type = 'button';
+      btn.onclick = function() {
+        if (this.classList.contains('on')) {
+          this.classList.remove('on');
+        } else {
+          this.classList.add('on');
+        }
+      };
+      container.appendChild(btn);
+    })(items[i]);
+  }
+}
+
+buildToggles('sec-row', SECTIONS);
+buildToggles('vis-row', VISUALS);
+
+function getActive(containerId) {
+  var btns = document.getElementById(containerId).querySelectorAll('.tog.on');
+  var vals = [];
+  for (var i = 0; i < btns.length; i++) {
+    vals.push(btns[i].getAttribute('data-val'));
+  }
+  return vals;
+}
+
+function generate() {
+  var name = document.getElementById('proj-name').value.trim() || '[PROJECT NAME]';
+  var url  = document.getElementById('proj-url').value.trim()  || '[PROJECT URL]';
+  var aud  = document.getElementById('audience').value;
+  var len  = document.getElementById('length').value;
+  var top  = document.getElementById('topics').value.trim();
+  var secs = getActive('sec-row');
+  var viss = getActive('vis-row');
+
+  var topicsLine = top
+    ? 'Pay special attention to these topics: ' + top + '.'
+    : 'Identify the most compelling topics yourself — prioritize anything unique, technically interesting, or newsworthy.';
+
+  var secMap = {
+    hook:  '1. HOOK INTRO\nOpen with a bold, attention-grabbing statement or question. No generic "In the world of blockchain..." openers. Make it specific and punchy.',
+    what:  '2. WHAT IS ' + name.toUpperCase() + '?\nExplain the project clearly in plain language. Assume the reader knows crypto basics but is not a developer. Use analogies if helpful.',
+    how:   '3. HOW IT WORKS\nExplain the core mechanism or protocol. Keep it accessible — no jargon walls. Use short paragraphs and concrete examples.',
+    why:   '4. WHY IT MATTERS\nExplain the real-world problem it solves and why this approach is different. Be honest — don\'t oversell, but make the case clearly.',
+    token: '5. TOKENOMICS\nCover token supply, distribution, utility, staking/rewards mechanics. ONLY use data found on the page — never invent numbers.',
+    road:  '6. ROADMAP\nSummarize upcoming milestones and achievements so far. Keep it factual and specific.',
+    comm:  '7. COMMUNITY & ECOSYSTEM\nMention partnerships, integrations, social channels, community size if available on the page.',
+    cta:   '8. CALL TO ACTION\nClose with a natural, non-salesy invitation: follow the project, join the community, try the product. End with a memorable one-liner.'
+  };
+
+  var visMap = {
+    hero:    '[HERO IMAGE] — Suggest a prompt for Midjourney/DALL-E for a strong on-brand article cover. Visual and thematic, not a logo.',
+    diag:    '[DIAGRAM] — At the point where the core mechanism is explained, describe what a simple flowchart should show (1–2 sentences).',
+    tchart:  '[TOKENOMICS CHART] — After the tokenomics section, list exact distribution values from the page for a pie/bar chart.',
+    screens: '[SCREENSHOT] — At relevant points, describe which specific screen or feature of the product should be shown.'
+  };
+
+  var secLines = [];
+  for (var i = 0; i < secs.length; i++) {
+    if (secMap[secs[i]]) secLines.push(secMap[secs[i]]);
+  }
+
+  var visLines = [];
+  for (var j = 0; j < viss.length; j++) {
+    if (visMap[viss[j]]) visLines.push(visMap[viss[j]]);
+  }
+
+  var prompt = [
+    'You are a professional Web3 content writer. Write a complete, publication-ready X Article (long-form, native to X/Twitter) about ' + name + '.',
+    '',
+    'SOURCE: Visit this URL and read all subpages before writing:',
+    url,
+    '',
+    topicsLine,
+    '',
+    '━━━ WRITING RULES ━━━',
+    '',
+    '• Language: English',
+    '• Tone: Expert but human — warm, engaging, genuinely excited. Not a marketer, not a whitepaper.',
+    '• Length: ' + len,
+    '• Target reader: ' + aud,
+    '• NEVER invent facts, numbers, names, or dates. Only use what is on the page. If data is missing, skip it.',
+    '• No filler: cut "In conclusion", "It is worth noting", "As we know" and similar phrases.',
+    '• Short paragraphs: 2–4 sentences max. Use white space.',
+    '• Vary sentence length. Mix punchy short lines with longer explanatory ones.',
+    '• Plain English only. If you use a technical term, explain it in the same sentence.',
+    '• BANNED words: revolutionary, game-changing, disruptive, groundbreaking, innovative. Do not use them.',
+    '• Section headers must be specific and interesting — e.g. "Staking without the lock-up headache" not "Staking".',
+    '',
+    '━━━ ARTICLE STRUCTURE ━━━',
+    '',
+    secLines.length > 0 ? secLines.join('\n\n') : '(No sections selected — write a natural flowing article)',
+    '',
+    '━━━ VISUAL PLACEHOLDERS ━━━',
+    'Insert each at the most natural point in the article:',
+    '',
+    visLines.length > 0 ? visLines.join('\n') : '(No visual placeholders selected)',
+    '',
+    '━━━ OUTPUT FORMAT ━━━',
+    '',
+    '• Clean Markdown ready to paste into X Articles editor',
+    '• # for title (H1), ## for section headers',
+    '• **Bold** key terms on first use',
+    '• Visual placeholders in [SQUARE BRACKETS] at the exact point they belong',
+    '• Start directly with the article title — zero preamble or commentary outside the article itself.'
+  ].join('\n');
+
+  var box = document.getElementById('output');
+  box.classList.remove('empty');
+  box.textContent = prompt;
+}
+
+function copyIt() {
+  var text = document.getElementById('output').textContent;
+  if (!text || document.getElementById('output').classList.contains('empty')) return;
+  navigator.clipboard.writeText(text).then(function() {
+    var fb = document.getElementById('fb');
+    fb.classList.add('show');
+    setTimeout(function() { fb.classList.remove('show'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
