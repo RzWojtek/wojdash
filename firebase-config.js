@@ -73,3 +73,12 @@ export const kuratorConfig = {
   messagingSenderId: "1006782589523",
   appId: "1:1006782589523:web:0c834783a89cb05160f4a6"
 };
+
+ 
+// ════════════════════════════════════════════════════════════
+//  UID użytkowników per aplikacja
+//  (każda aplikacja może mieć inne konto Google)
+// ════════════════════════════════════════════════════════════
+export const KURATOR_UID    = 'IBg9euqw0ZMNFwBKDVLrD3Qs4sH2';
+export const CRYPTOTODO_UID = '8mVxUaygq3e2B0gbVmQah2BGEDD3';
+export const VPS_UID        = '0SNtjmHctNOs3Z6io3xoBP2w7sV2';
