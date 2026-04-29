@@ -21,7 +21,8 @@ import { getFirestore as getFS2 } from "https://www.gstatic.com/firebasejs/10.12
 // ════════════════════════════════════════════════════════
 import {
   firebaseConfig, xpostConfig, tiktokConfig,
-  signalConfig, cryptotodoConfig, vpsConfig, kuratorConfig
+  signalConfig, cryptotodoConfig, vpsConfig, kuratorConfig,
+  KURATOR_UID, CRYPTOTODO_UID, VPS_UID
 } from "./firebase-config.js";
 
 
@@ -52,6 +53,9 @@ window._doc=doc; window._getDoc=getDoc; window._setDoc=setDoc;
 window._collection=collection; window._getDocs=getDocs;
 window._query=query; window._orderBy=orderBy;
 window._limit=limit; window._onSnapshot=onSnapshot; window._where=where;
+window._KURATOR_UID=KURATOR_UID;
+window._CRYPTOTODO_UID=CRYPTOTODO_UID;
+window._VPS_UID=VPS_UID;
 
 onAuthStateChanged(auth, user => {
   if (user) {
@@ -776,8 +780,9 @@ async function renderStats(proj){
   } else if(proj.id==='cryptotodo' && window._cryptoDb){
     area.innerHTML=`<div id="crypto-tasks-area"><div class="stats-none">⏳ Ładowanie zadań...</div></div>`;
     try{
+      const CTUID = window._CRYPTOTODO_UID || window._uid;
       const tasksSnap=await window._getDocs(
-        window._query(window._collection(window._cryptoDb,'users',window._uid,'tasks'),window._orderBy('createdAt'))
+        window._query(window._collection(window._cryptoDb,'users',CTUID,'tasks'),window._orderBy('createdAt'))
       );
       const tasksArea=document.getElementById('crypto-tasks-area');
       if(!tasksSnap||tasksSnap.empty){
@@ -817,9 +822,11 @@ async function renderStats(proj){
     try{
       const today = new Date(); today.setHours(0,0,0,0);
       const todayStr = today.toISOString().split('T')[0];
+      // UID z Aplikacji Kuratora (może być inny niż UID WojDash)
+      const KURATOR_UID = window._KURATOR_UID || 'IBg9euqw0ZMNFwBKDVLrD3Qs4sH2';
       const results = [];
 
-      // 1. Pobierz imiona z kal_persons (root)
+      // 1. Imiona z kal_persons (root)
       const kalSnap = await window._getDocs(
         window._collection(window._kuratorDb,'kal_persons')
       );
@@ -829,22 +836,22 @@ async function renderStats(proj){
           const personId = kalDoc.id;
           const personName = kalDoc.data().imie || kalDoc.data().name || personId;
 
-          // 2. Pobierz ustawienia z users/{uid}/persons/{personId}/kal_settings/config
+          // 2. Ustawienia z users/{KURATOR_UID}/persons/{personId}/kal_settings/config
           const cfgSnap = await window._getDocs(
-            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_settings')
+            window._collection(window._kuratorDb,'users',KURATOR_UID,'persons',personId,'kal_settings')
           );
           const cfgDoc = cfgSnap.docs.find(d=>d.id==='config');
           if(!cfgDoc) continue;
           const cfg = cfgDoc.data();
           if(!cfg.startDate || !cfg.freq) continue;
 
-          // 3. Pobierz historię z users/{uid}/persons/{personId}/kal_historia
+          // 3. Historia z users/{KURATOR_UID}/persons/{personId}/kal_historia
           const histSnap = await window._getDocs(
-            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_historia')
+            window._collection(window._kuratorDb,'users',KURATOR_UID,'persons',personId,'kal_historia')
           );
           const hist = histSnap.docs.map(d=>d.data());
 
-          // 4. Identyczna logika jak w Kalendarz.jsx linia 64-80
+          // 4. Identyczna logika jak Kalendarz.jsx
           const dates = generateDates(cfg.startDate, cfg.freq);
           const effectiveDate = getEffectiveDate(dates, hist, todayStr);
           if(effectiveDate){
@@ -880,6 +887,7 @@ async function renderStats(proj){
       <div class="stat-box"><div class="stat-val loading" id="vps-uptime" style="color:var(--green)">…</div><div class="stat-label">UPTIME</div></div>
     </div><div id="vps-detail" style="padding:6px 16px;font-family:var(--mono);font-size:9px;color:var(--muted);border-bottom:1px solid var(--border);"></div>`;
     try{
+      const VPSUID = window._VPS_UID || window._uid;
       const snap=await window._getDoc(window._doc(window._vpsDb,'vps_monitor','health'));
       if(snap.exists()){
         const d=snap.data();
