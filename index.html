@@ -404,6 +404,7 @@ header{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content
               </div>
               <div class="detail-actions">
                 <button class="edit-proj-btn" onclick="editCurrentProject()">✏️ Edytuj</button>
+                <button class="edit-proj-btn" onclick="deleteCurrentProject()" style="color:var(--red);border-color:rgba(255,107,107,.25);">🗑 Usuń</button>
                 <a href="#" target="_blank" class="open-link-btn" id="d-open-btn">↗ OTWÓRZ</a>
               </div>
             </div>
@@ -814,46 +815,55 @@ async function renderStats(proj){
   } else if(proj.id==='kurator' && window._kuratorDb){
     area.innerHTML=`<div class="kurator-table" id="kurator-terms"><div class="stats-none">⏳ Ładowanie terminów...</div></div>`;
     try{
-      // Ścieżka z Kalendarz.jsx: users/{uid}/persons/{personId}/kal_settings/config
-      const personsSnap=await window._getDocs(
-        window._collection(window._kuratorDb,'users',window._uid,'persons')
+      const today = new Date().toISOString().split('T')[0];
+      const results = [];
+
+      // kal_persons (root) zawiera imię i ID osoby
+      // users/{uid}/persons/{personId}/kal_settings/config zawiera startDate i freq
+      // users/{uid}/persons/{personId}/kal_historia zawiera historię oddań
+
+      const kalPersonsSnap = await window._getDocs(
+        window._collection(window._kuratorDb,'kal_persons')
       );
-      const persons=personsSnap.docs.map(d=>({id:d.id,...d.data()}));
-      const today=new Date().toISOString().split('T')[0];
-      const results=[];
-      for(const person of persons){
+
+      for(const kalDoc of kalPersonsSnap.docs){
         try{
-          // kal_settings/config
-          const cfgSnap=await window._getDocs(
-            window._collection(window._kuratorDb,'users',window._uid,'persons',person.id,'kal_settings')
+          const personId = kalDoc.id;
+          const personName = kalDoc.data().imie || kalDoc.data().name || personId;
+
+          // Pobierz config kalendarza z users/{uid}/persons/{id}/kal_settings/config
+          const cfgSnap = await window._getDocs(
+            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_settings')
           );
-          const cfgDoc=cfgSnap.docs.find(d=>d.id==='config');
+          const cfgDoc = cfgSnap.docs.find(d=>d.id==='config');
           if(!cfgDoc) continue;
-          const cfg=cfgDoc.data();
-          if(!cfg.startDate||!cfg.freq) continue;
-          // kal_historia
-          const histSnap=await window._getDocs(
-            window._collection(window._kuratorDb,'users',window._uid,'persons',person.id,'kal_historia')
+          const cfg = cfgDoc.data();
+          if(!cfg.startDate || !cfg.freq) continue;
+
+          // Historia oddanych
+          const histSnap = await window._getDocs(
+            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_historia')
           );
-          const hist=histSnap.docs.map(d=>d.data());
-          // wylicz następny efektywny termin (identycznie jak Kalendarz.jsx)
-          const dates=generateDates(cfg.startDate,cfg.freq);
-          const effectiveDate=getEffectiveDate(dates,hist,today);
+          const hist = histSnap.docs.map(d=>d.data());
+
+          const dates = generateDates(cfg.startDate, cfg.freq);
+          const effectiveDate = getEffectiveDate(dates, hist, today);
           if(effectiveDate){
-            const days=Math.round((new Date(effectiveDate)-new Date(today))/86400000);
-            results.push({name:person.name||person.nazwisko||person.id,date:effectiveDate,days});
+            const days = Math.round((new Date(effectiveDate)-new Date(today))/86400000);
+            results.push({name:personName, date:effectiveDate, days});
           }
         }catch(e2){ /* pomiń osobę z błędem */ }
       }
+
       results.sort((a,b)=>a.days-b.days);
-      const box=document.getElementById('kurator-terms');
+      const box = document.getElementById('kurator-terms');
       if(!results.length){
-        box.innerHTML='<div class="stats-none">Brak skonfigurowanych terminów — dodaj je w Aplikacji Kuratora → Kalendarz</div>';
+        box.innerHTML='<div class="stats-none">Brak skonfigurowanych terminów</div>';
         return;
       }
-      box.innerHTML=results.map(r=>{
-        const cls=r.days<0?'over':r.days<=14?'warn':'ok';
-        const label=r.days<0?`${Math.abs(r.days)} dni PO TERMINIE`:r.days===0?'⚠️ DZIŚ!':r.days===1?'jutro':`za ${r.days} dni`;
+      box.innerHTML = results.map(r=>{
+        const cls = r.days<0?'over':r.days<=14?'warn':'ok';
+        const label = r.days<0?`${Math.abs(r.days)} dni PO TERMINIE`:r.days===0?'⚠️ DZIŚ!':r.days===1?'jutro':`za ${r.days} dni`;
         return `<div class="kurator-row">
           <span class="kurator-name">${esc(r.name)}</span>
           <span class="kurator-date">${r.date}</span>
@@ -969,6 +979,18 @@ function openAddProjectModal(){
   ['mp-name','mp-icon','mp-desc','mp-url'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('mp-color').value='#00e5ff'; document.getElementById('mp-type').value='vercel';
   document.getElementById('modal-proj').classList.add('open'); setTimeout(()=>document.getElementById('mp-name').focus(),50);
+}
+function deleteCurrentProject(){
+  const proj=STATE.projects.find(p=>p.id===activePid);
+  if(!proj) return;
+  if(!confirm(`Usunąć projekt "${proj.name}"?\n\nNotatki i skrypty tego projektu zostaną zachowane w Firebase.`)) return;
+  STATE.projects=STATE.projects.filter(p=>p.id!==activePid);
+  fbSet('settings','projects',{list:STATE.projects});
+  activePid=null;
+  document.getElementById('detail-empty').style.display='flex';
+  document.getElementById('detail-content').style.display='none';
+  renderProjects();
+  toast('✓ Usunięto projekt: '+proj.name);
 }
 function editCurrentProject(){
   const proj=STATE.projects.find(p=>p.id===activePid); if(!proj) return;
