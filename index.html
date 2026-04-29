@@ -815,31 +815,40 @@ async function renderStats(proj){
   } else if(proj.id==='kurator' && window._kuratorDb){
     area.innerHTML=`<div class="kurator-table" id="kurator-terms"><div class="stats-none">⏳ Ładowanie terminów...</div></div>`;
     try{
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date(); today.setHours(0,0,0,0);
+      const todayStr = today.toISOString().split('T')[0];
       const results = [];
 
-      // Struktura: kal_persons/{personId} → {imie, startDate, freq}
-      // Historia:  kal_persons/{personId}/kal_historia/{id} → {datumOddania}
+      // 1. Pobierz imiona z kal_persons (root)
       const kalSnap = await window._getDocs(
         window._collection(window._kuratorDb,'kal_persons')
       );
 
-      for(const doc of kalSnap.docs){
+      for(const kalDoc of kalSnap.docs){
         try{
-          const p = doc.data();
-          if(!p.startDate || !p.freq) continue;
-          const personName = p.imie || p.name || doc.id;
+          const personId = kalDoc.id;
+          const personName = kalDoc.data().imie || kalDoc.data().name || personId;
 
-          // Historia oddanych sprawozdań
+          // 2. Pobierz ustawienia z users/{uid}/persons/{personId}/kal_settings/config
+          const cfgSnap = await window._getDocs(
+            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_settings')
+          );
+          const cfgDoc = cfgSnap.docs.find(d=>d.id==='config');
+          if(!cfgDoc) continue;
+          const cfg = cfgDoc.data();
+          if(!cfg.startDate || !cfg.freq) continue;
+
+          // 3. Pobierz historię z users/{uid}/persons/{personId}/kal_historia
           const histSnap = await window._getDocs(
-            window._collection(window._kuratorDb,'kal_persons',doc.id,'kal_historia')
+            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_historia')
           );
           const hist = histSnap.docs.map(d=>d.data());
 
-          const dates = generateDates(p.startDate, p.freq);
-          const effectiveDate = getEffectiveDate(dates, hist, today);
+          // 4. Identyczna logika jak w Kalendarz.jsx linia 64-80
+          const dates = generateDates(cfg.startDate, cfg.freq);
+          const effectiveDate = getEffectiveDate(dates, hist, todayStr);
           if(effectiveDate){
-            const days = Math.round((new Date(effectiveDate)-new Date(today))/86400000);
+            const days = Math.round((new Date(effectiveDate)-today)/86400000);
             results.push({name:personName, date:effectiveDate, days});
           }
         }catch(e2){ /* pomiń */ }
@@ -902,42 +911,28 @@ async function renderStats(proj){
 ══════════════════════════════════════ */
 function generateDates(startDate, freq){
   const dates=[]; let current=startDate;
-  const limit=new Date(); limit.setFullYear(limit.getFullYear()+10);
-  while(new Date(current)<=limit){
-    dates.push(current);
-    current=addFreq(current,freq);
-  }
+  const limit=new Date(startDate); limit.setFullYear(limit.getFullYear()+10);
+  while(new Date(current)<=limit){ dates.push(current); current=addFreq(current,freq); }
   return dates;
 }
 function addFreq(dateStr,freq){
   const d=new Date(dateStr);
   if(freq==='2w') d.setDate(d.getDate()+14);
-  else if(freq==='1m') d.setMonth(d.getMonth()+1);
-  else if(freq==='2m') d.setMonth(d.getMonth()+2);
-  else if(freq==='3m') d.setMonth(d.getMonth()+3);
-  else if(freq==='6m') d.setMonth(d.getMonth()+6);
-  else if(freq==='1y') d.setFullYear(d.getFullYear()+1);
   else d.setMonth(d.getMonth()+parseInt(freq));
   return d.toISOString().split('T')[0];
 }
-function getEffectiveDate(dates, hist, today){
-  // Daty oddanych sprawozdań
-  const oddane = (hist||[]).map(h=>h.datumOddania||h.data||h.date||'').filter(Boolean).sort();
-
-  // Dla każdej daty z harmonogramu sprawdź czy jest pokryta przez historię
-  // "Pokryta" = oddano sprawozdanie w oknie [poprzednia_data, ta_data]
-  for(let i=0; i<dates.length; i++){
-    const current = dates[i];
-    const prev = i>0 ? dates[i-1] : '0000-00-00';
-    // Czy w historii jest wpis między poprzednią datą a bieżącą?
-    const pokryta = oddane.some(o => o > prev && o <= current);
-    if(!pokryta){
-      // Ta data nie jest pokryta — to jest aktualny termin
-      return current;
+function getEffectiveDate(dates, hist, todayStr){
+  // Identyczna logika jak Kalendarz.jsx linia 64-80
+  const pastDates = dates.filter(d => d < todayStr);
+  if(pastDates.length > 0){
+    const lastPast = pastDates[pastDates.length-1];
+    const histDates = (hist||[]).map(h=>h.datumOddania).sort();
+    const coveredAfter = histDates.find(h => h >= lastPast);
+    if(!coveredAfter){
+      return lastPast; // termin przeterminowany bez odnotowania
     }
   }
-  // Wszystkie pokryte — zwróć ostatnią datę z harmonogramu
-  return dates[dates.length-1]||null;
+  return dates.find(d => d >= todayStr) || null;
 }
 
 /* ══════════════════════════════════════
