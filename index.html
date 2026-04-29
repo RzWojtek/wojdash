@@ -818,41 +818,31 @@ async function renderStats(proj){
       const today = new Date().toISOString().split('T')[0];
       const results = [];
 
-      // kal_persons (root) zawiera imię i ID osoby
-      // users/{uid}/persons/{personId}/kal_settings/config zawiera startDate i freq
-      // users/{uid}/persons/{personId}/kal_historia zawiera historię oddań
-
-      const kalPersonsSnap = await window._getDocs(
+      // Struktura: kal_persons/{personId} → {imie, startDate, freq}
+      // Historia:  kal_persons/{personId}/kal_historia/{id} → {datumOddania}
+      const kalSnap = await window._getDocs(
         window._collection(window._kuratorDb,'kal_persons')
       );
 
-      for(const kalDoc of kalPersonsSnap.docs){
+      for(const doc of kalSnap.docs){
         try{
-          const personId = kalDoc.id;
-          const personName = kalDoc.data().imie || kalDoc.data().name || personId;
+          const p = doc.data();
+          if(!p.startDate || !p.freq) continue;
+          const personName = p.imie || p.name || doc.id;
 
-          // Pobierz config kalendarza z users/{uid}/persons/{id}/kal_settings/config
-          const cfgSnap = await window._getDocs(
-            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_settings')
-          );
-          const cfgDoc = cfgSnap.docs.find(d=>d.id==='config');
-          if(!cfgDoc) continue;
-          const cfg = cfgDoc.data();
-          if(!cfg.startDate || !cfg.freq) continue;
-
-          // Historia oddanych
+          // Historia oddanych sprawozdań
           const histSnap = await window._getDocs(
-            window._collection(window._kuratorDb,'users',window._uid,'persons',personId,'kal_historia')
+            window._collection(window._kuratorDb,'kal_persons',doc.id,'kal_historia')
           );
           const hist = histSnap.docs.map(d=>d.data());
 
-          const dates = generateDates(cfg.startDate, cfg.freq);
+          const dates = generateDates(p.startDate, p.freq);
           const effectiveDate = getEffectiveDate(dates, hist, today);
           if(effectiveDate){
             const days = Math.round((new Date(effectiveDate)-new Date(today))/86400000);
             results.push({name:personName, date:effectiveDate, days});
           }
-        }catch(e2){ /* pomiń osobę z błędem */ }
+        }catch(e2){ /* pomiń */ }
       }
 
       results.sort((a,b)=>a.days-b.days);
