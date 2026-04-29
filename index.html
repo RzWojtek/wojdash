@@ -822,36 +822,35 @@ async function renderStats(proj){
     try{
       const today = new Date(); today.setHours(0,0,0,0);
       const todayStr = today.toISOString().split('T')[0];
-      // UID z Aplikacji Kuratora (może być inny niż UID WojDash)
-      const KURATOR_UID = window._KURATOR_UID || 'IBg9euqw0ZMNFwBKDVLrD3Qs4sH2';
+      const KUID = window._KURATOR_UID || 'IBg9euqw0ZMNFwBKDVLrD3Qs4sH2';
       const results = [];
 
-      // 1. Imiona z kal_persons (root)
-      const kalSnap = await window._getDocs(
-        window._collection(window._kuratorDb,'kal_persons')
+      // Pobierz persons z users/{KUID}/persons — mają imie + kal_settings/config
+      const personsSnap = await window._getDocs(
+        window._collection(window._kuratorDb,'users',KUID,'persons')
       );
 
-      for(const kalDoc of kalSnap.docs){
+      for(const personDoc of personsSnap.docs){
         try{
-          const personId = kalDoc.id;
-          const personName = kalDoc.data().imie || kalDoc.data().name || personId;
+          const personId = personDoc.id;
+          const personName = personDoc.data().imie || personDoc.data().name || personId;
 
-          // 2. Ustawienia z users/{KURATOR_UID}/persons/{personId}/kal_settings/config
+          // Pobierz kal_settings/config
           const cfgSnap = await window._getDocs(
-            window._collection(window._kuratorDb,'users',KURATOR_UID,'persons',personId,'kal_settings')
+            window._collection(window._kuratorDb,'users',KUID,'persons',personId,'kal_settings')
           );
           const cfgDoc = cfgSnap.docs.find(d=>d.id==='config');
           if(!cfgDoc) continue;
           const cfg = cfgDoc.data();
           if(!cfg.startDate || !cfg.freq) continue;
 
-          // 3. Historia z users/{KURATOR_UID}/persons/{personId}/kal_historia
+          // Pobierz historię
           const histSnap = await window._getDocs(
-            window._collection(window._kuratorDb,'users',KURATOR_UID,'persons',personId,'kal_historia')
+            window._collection(window._kuratorDb,'users',KUID,'persons',personId,'kal_historia')
           );
           const hist = histSnap.docs.map(d=>d.data());
 
-          // 4. Identyczna logika jak Kalendarz.jsx
+          // Wylicz termin — identyczna logika jak Kalendarz.jsx
           const dates = generateDates(cfg.startDate, cfg.freq);
           const effectiveDate = getEffectiveDate(dates, hist, todayStr);
           if(effectiveDate){
