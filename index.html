@@ -900,27 +900,44 @@ async function renderStats(proj){
 /* ══════════════════════════════════════
    HELPERS — Kurator
 ══════════════════════════════════════ */
-function generateDates(startDate,freq){
+function generateDates(startDate, freq){
   const dates=[]; let current=startDate;
-  const limit=new Date(startDate); limit.setFullYear(limit.getFullYear()+10);
-  while(new Date(current)<=limit){ dates.push(current); current=addFreq(current,freq); }
+  const limit=new Date(); limit.setFullYear(limit.getFullYear()+10);
+  while(new Date(current)<=limit){
+    dates.push(current);
+    current=addFreq(current,freq);
+  }
   return dates;
 }
 function addFreq(dateStr,freq){
   const d=new Date(dateStr);
   if(freq==='2w') d.setDate(d.getDate()+14);
+  else if(freq==='1m') d.setMonth(d.getMonth()+1);
+  else if(freq==='2m') d.setMonth(d.getMonth()+2);
+  else if(freq==='3m') d.setMonth(d.getMonth()+3);
+  else if(freq==='6m') d.setMonth(d.getMonth()+6);
+  else if(freq==='1y') d.setFullYear(d.getFullYear()+1);
   else d.setMonth(d.getMonth()+parseInt(freq));
   return d.toISOString().split('T')[0];
 }
-function getEffectiveDate(dates,hist,today){
-  const pastDates=dates.filter(d=>d<today);
-  if(pastDates.length>0){
-    const lastPast=pastDates[pastDates.length-1];
-    const histDates=(hist||[]).map(h=>h.datumOddania).sort();
-    const coveredAfter=histDates.find(h=>h>=lastPast);
-    if(!coveredAfter) return lastPast;
+function getEffectiveDate(dates, hist, today){
+  // Daty oddanych sprawozdań
+  const oddane = (hist||[]).map(h=>h.datumOddania||h.data||h.date||'').filter(Boolean).sort();
+
+  // Dla każdej daty z harmonogramu sprawdź czy jest pokryta przez historię
+  // "Pokryta" = oddano sprawozdanie w oknie [poprzednia_data, ta_data]
+  for(let i=0; i<dates.length; i++){
+    const current = dates[i];
+    const prev = i>0 ? dates[i-1] : '0000-00-00';
+    // Czy w historii jest wpis między poprzednią datą a bieżącą?
+    const pokryta = oddane.some(o => o > prev && o <= current);
+    if(!pokryta){
+      // Ta data nie jest pokryta — to jest aktualny termin
+      return current;
+    }
   }
-  return dates.find(d=>d>=today)||null;
+  // Wszystkie pokryte — zwróć ostatnią datę z harmonogramu
+  return dates[dates.length-1]||null;
 }
 
 /* ══════════════════════════════════════
