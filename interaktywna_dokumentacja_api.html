@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Dokumentacja API</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    height: 100vh;
+    background: #f4f4f4;
+  }
+  aside {
+    width: 260px;
+    background:#222;
+    color:#fff;
+    padding:10px;
+    overflow-y:auto;
+  }
+  aside ul { list-style:none; padding:0; }
+  aside li {
+    padding:6px;
+    cursor:pointer;
+    border-radius:4px;
+  }
+  aside li:hover { background:#444; }
+
+  main {
+    flex:1;
+    padding:20px;
+    overflow-y:auto;
+  }
+
+  button {
+    margin:4px;
+    padding:6px 10px;
+    cursor:pointer;
+  }
+
+  details {
+    background:#fff;
+    border:1px solid #ccc;
+    border-radius:6px;
+    padding:10px;
+    margin-bottom:10px;
+  }
+
+  details details {
+    margin-left:20px;
+    margin-top:8px;
+    background:#fafafa;
+  }
+
+  summary {
+    font-weight:bold;
+    cursor:pointer;
+  }
+
+  textarea {
+    width:100%;
+    min-height:120px;
+    font-family:Consolas, monospace;
+    margin-top:6px;
+  }
+
+  input[type="text"] {
+    width:100%;
+    padding:6px;
+    margin:6px 0;
+  }
+
+  .toolbar { margin-bottom:12px; }
+</style>
+</head>
+
+<body>
+
+<aside>
+  <h3>Endpointy</h3>
+  <ul id="menu"></ul>
+</aside>
+
+<main>
+  <h1>Dokumentacja API</h1>
+
+  <div class="toolbar">
+    <button onclick="addEndpoint()">➕ Dodaj endpoint</button>
+    <button onclick="exportJSON()">⬇️ Export JSON</button>
+    <input type="file" onchange="importJSON(this.files[0])">
+  </div>
+
+  <div id="endpoints"></div>
+</main>
+
+<script>
+var data = [];
+var menu = document.getElementById("menu");
+var endpointsDiv = document.getElementById("endpoints");
+
+/* ===== JSON FORMAT ===== */
+function formatJsonIfPossible(text) {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+/* ===== SAVE / LOAD + MIGRATION ===== */
+function save() {
+  localStorage.setItem("apiDoc", JSON.stringify(data));
+}
+
+function migrate(old) {
+  return old.map(ep => ({
+    name: ep.name || "POST NAZWA_ENDPOINTU – Opis",
+    requests: ep.requests || [],
+    examples: ep.examples || [],
+    tests: ep.tests || [],
+    isOpen: ep.isOpen ?? true
+  }));
+}
+
+function load() {
+  const saved = localStorage.getItem("apiDoc");
+  if (saved) {
+    data = migrate(JSON.parse(saved));
+  }
+  save();
+  render();
+}
+
+/* ===== EXPORT / IMPORT ===== */
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "api-documentation.json";
+  a.click();
+}
+
+function importJSON(file) {
+  const reader = new FileReader();
+  reader.onload = function () {
+    try {
+      data = migrate(JSON.parse(reader.result));
+      save();
+      render();
+    } catch {
+      alert("Nieprawidłowy plik JSON");
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ===== ENDPOINT ===== */
+function addEndpoint() {
+  data.push({
+    name: "POST NAZWA_ENDPOINTU – Opis",
+    requests: [],
+    examples: [],
+    tests: [],
+    isOpen: true
+  });
+  save();
+  render();
+}
+
+/* ===== UI HELPERS ===== */
+function buildSection(title, arr, onAdd, onChange) {
+  const d = document.createElement("details");
+  d.open = true;
+
+  const s = document.createElement("summary");
+  s.textContent = title;
+  d.appendChild(s);
+
+  const b = document.createElement("button");
+  b.textContent = "➕ Dodaj";
+  b.onclick = onAdd;
+  d.appendChild(b);
+
+  arr.forEach((val, i) => {
+    const t = document.createElement("textarea");
+    t.value = val;
+    t.onchange = () => onChange(i, t.value);
+    d.appendChild(t);
+  });
+
+  return d;
+}
+
+/* ===== RENDER ===== */
+function render() {
+  menu.innerHTML = "";
+  endpointsDiv.innerHTML = "";
+
+  data.forEach((ep, i) => {
+    const li = document.createElement("li");
+    li.textContent = (i + 1) + ". " + ep.name;
+    li.onclick = () => document.getElementById("ep" + i).scrollIntoView();
+    menu.appendChild(li);
+
+    const d = document.createElement("details");
+    d.id = "ep" + i;
+    d.open = ep.isOpen;
+    d.ontoggle = () => { ep.isOpen = d.open; save(); };
+
+    const s = document.createElement("summary");
+    s.textContent = (i + 1) + ". " + ep.name;
+    d.appendChild(s);
+
+    const input = document.createElement("input");
+    input.value = ep.name;
+    input.onchange = () => { ep.name = input.value; save(); render(); };
+    d.appendChild(input);
+
+    d.appendChild(buildSection(
+      "Requesty API",
+      ep.requests,
+      () => { ep.requests.push(formatJsonIfPossible("{}")); save(); render(); },
+      (i, v) => { ep.requests[i] = formatJsonIfPossible(v); save(); }
+    ));
+
+    d.appendChild(buildSection(
+      "Przykłady request",
+      ep.examples,
+      () => { ep.examples.push(formatJsonIfPossible("{}")); save(); render(); },
+      (i, v) => { ep.examples[i] = formatJsonIfPossible(v); save(); }
+    ));
+
+    d.appendChild(buildSection(
+      "Testy",
+      ep.tests,
+      () => { ep.tests.push(formatJsonIfPossible("{}")); save(); render(); },
+      (i, v) => { ep.tests[i] = formatJsonIfPossible(v); save(); }
+    ));
+
+    endpointsDiv.appendChild(d);
+  });
+}
+
+load();
+</script>
+
+</body>
+</html>
