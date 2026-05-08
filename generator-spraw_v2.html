@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generator JSON – sprawy sądowe</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; padding:20px; }
+    .container { max-width:1400px; margin:auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+    h1 { margin-top:0; }
+    label { font-size:12px; color:#444; margin-bottom:4px; }
+    input, select, textarea { padding:8px; border:1px solid #ccc; border-radius:4px; font-family: monospace; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .field { display:flex; flex-direction:column; }
+    .full { grid-column:1 / -1; }
+    textarea { height:100px; }
+    button { padding:10px 14px; border:none; border-radius:4px; cursor:pointer; }
+    .primary { background:#2563eb; color:#fff; }
+    .secondary { background:#e5e7eb; }
+    .danger  { background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; }
+    .endpoint { display:none; }
+    .endpoint.active { display:block; }
+    .actions { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+    /* Live preview toggle */
+    .live-toggle { display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:8px 12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; font-size:13px; }
+    .live-toggle input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
+    .live-badge { font-size:11px; background:#2563eb; color:#fff; padding:2px 6px; border-radius:10px; }
+
+    /* JSON syntax highlight output */
+    #output-pre {
+      height:420px; overflow:auto; background:#1e1e2e; color:#cdd6f4;
+      border-radius:4px; padding:10px; font-family:monospace; font-size:13px;
+      line-height:1.5; margin:0; white-space:pre; border:1px solid #ccc;
+    }
+    .json-key    { color:#89b4fa; }
+    .json-string { color:#a6e3a1; }
+    .json-number { color:#fab387; }
+    .json-bool   { color:#f38ba8; }
+    .json-null   { color:#6c7086; font-style:italic; }
+
+    /* Copy confirm */
+    .copy-confirm { font-size:13px; color:#16a34a; font-weight:bold; display:none; }
+
+    /* Counter badge */
+    .id-counter { font-size:12px; color:#6b7280; font-style:italic; margin-left:4px; }
+
+    /* Warning */
+    .warn-empty { font-size:12px; color:#dc2626; font-weight:bold; display:none; margin-top:4px; }
+
+    /* Batch load */
+    .batch-btn { font-size:12px; padding:4px 8px; background:#f3f4f6; border:1px solid #d1d5db; border-radius:4px; cursor:pointer; }
+    .batch-input { display:none; }
+
+    /* Collapsible "Pozostałe" */
+    .collapsible-header {
+      display:flex; align-items:center; justify-content:space-between;
+      cursor:pointer; user-select:none;
+      background:#f9fafb; border:1px solid #e5e7eb;
+      border-radius:6px; padding:10px 14px; margin-bottom:8px;
+    }
+    .collapsible-header h4 { margin:0; font-size:14px; }
+    .collapsible-header .arrow { font-size:12px; transition:transform .2s; }
+    .collapsible-header.open .arrow { transform:rotate(180deg); }
+    .collapsible-body { overflow:hidden; transition:max-height .25s ease; }
+    .collapsible-body .inner { padding:12px; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 6px 6px; margin-bottom:12px; }
+
+    /* Profile bar */
+    .profile-bar {
+      display:flex; align-items:center; gap:8px; margin-bottom:14px;
+      padding:10px 14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px;
+    }
+    .profile-bar label { margin:0; font-size:13px; color:#15803d; font-weight:bold; white-space:nowrap; }
+    .profile-bar select { flex:1; background:#fff; }
+    .profile-bar button { padding:6px 10px; font-size:12px; }
+
+    /* Profile editor modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:#fff; border-radius:8px; padding:24px; width:700px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.2); }
+    .modal h2 { margin-top:0; font-size:18px; }
+    .modal-tabs { display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap; }
+    .modal-tab { padding:6px 12px; border:1px solid #d1d5db; border-radius:4px; cursor:pointer; font-size:13px; background:#f9fafb; }
+    .modal-tab.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+    .modal-content { display:none; }
+    .modal-content.active { display:block; }
+    .profile-list { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; max-height:300px; overflow-y:auto; }
+    .profile-item { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; padding:8px; border:1px solid #e5e7eb; border-radius:4px; background:#f9fafb; }
+    .profile-item-name { font-size:13px; font-weight:bold; }
+    .profile-item-details { font-size:11px; color:#6b7280; font-family:monospace; }
+    .profile-item-actions { display:flex; gap:4px; }
+    .profile-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .profile-form .pf-full { grid-column:1/-1; }
+    .profile-form input { width:100%; box-sizing:border-box; font-size:13px; }
+    .profile-form label { font-size:12px; }
+
+    /* Signature parse hint */
+    .sig-hint { font-size:11px; color:#6b7280; margin-top:4px; font-style:italic; }
+    .sig-parsed { font-size:11px; color:#15803d; margin-top:4px; display:none; }
+  </style>
+</head>
+<body>
+<div class="container">
+<h1>Generator JSON – sprawy sądowe</h1>
+
+<!-- Live preview toggle -->
+<div class="live-toggle">
+  <input type="checkbox" id="liveMode">
+  <label for="liveMode" style="margin:0;cursor:pointer;">Auto-generowanie (live preview)</label>
+  <span class="live-badge" id="liveBadge" style="display:none;">LIVE</span>
+</div>
+
+<div class="grid" style="margin-bottom:12px;">
+  <div class="field">
+    <label>Wybierz endpoint</label>
+    <select id="endpointSelect">
+      <option value="add">Dodawanie spraw</option>
+      <option value="finish">Zamykanie spraw (po ID)</option>
+      <option value="finishSig">Zamykanie spraw po sygnaturze</option>
+      <option value="exclude">Wyłączenie ze sprawy</option>
+      <option value="changeRef">Zamiana referenta</option>
+      <option value="other">Pozostałe</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Profil sądu / wydziału <span style="color:#6b7280;font-weight:normal">(zależny od endpointu)</span></label>
+    <div style="display:flex;gap:6px;">
+      <select id="profileSelect" style="flex:1" onchange="applyProfile()">
+        <option value="">— wybierz profil —</option>
+      </select>
+      <button onclick="openProfileEditor()" title="Zarządzaj profilami" style="padding:6px 10px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;font-size:16px;">⚙️</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 1. DODAWANIE SPRAW ===================== -->
+<div id="endpoint-add" class="endpoint active">
+  <h3>Dodawanie spraw</h3>
+  <div class="grid">
+    <div class="field"><label>CourtId</label><input id="a_CourtId" value="2006"></div>
+    <div class="field"><label>DepartmentId</label><input id="a_DepartmentId" value="50079361"></div>
+    <div class="field full"><label>serviceName</label><input id="a_serviceName" value="TestyLomza"></div>
+    <div class="field"><label>JudgesCount</label><input id="a_JudgesCount" value="1"></div>
+    <div class="field"><label>CategorySymbolId</label><input id="a_CategorySymbolId" value="5352"></div>
+    <div class="field"><label>PrimaryLayJudgesCount</label><input id="a_PrimaryLayJudgesCount" value="0"></div>
+    <div class="field"><label>AdditionalLayJudgesCount</label><input id="a_AdditionalLayJudgesCount" value="0"></div>
+    <div class="field"><label>IsCurrentTrio</label><input id="a_IsCurrentTrio" value="true"></div>
+    <div class="field"><label>PresidingJudgeOnly</label><input id="a_PresidingJudgeOnly" placeholder="null"></div>
+    <div class="field"><label>Username</label><input id="a_Username" value="WR"></div>
+    <div class="field"><label>IsDrawFromAllJudgesWithHolidays</label><input id="a_IsDrawFromAllJudgesWithHolidays" value="false"></div>
+    <div class="field"><label>RepertoryId</label><input id="a_RepertoryId" value="341"></div>
+    <div class="field"><label>Start OrderNumber</label><input id="a_StartOrder" type="number" value="12"></div>
+    <div class="field"><label>Year</label><input id="a_Year" value="2026"></div>
+    <div class="field"><label>DepartmentNumberOrCode</label><input id="a_DepartmentNumberOrCode" value="I"></div>
+    <div class="field full"><label>Ilość spraw</label><input id="a_Count" type="number" value="3"></div>
+    <div class="field full"><label>SQL</label><textarea id="sql_add"></textarea></div>
+  </div>
+  <div class="actions">
+    <button class="primary" onclick="generateAdd()">Generuj JSON</button>
+    <button onclick="copySQLField('sql_add', this)">Kopiuj SQL</button>
+    <span class="copy-confirm">✅ Skopiowano!</span>
+  </div>
+</div>
+
+<!-- ===================== 2. ZAMYKANIE SPRAW (PO ID) ===================== -->
+<div id="endpoint-finish" class="endpoint">
+  <h3>Zamykanie spraw (po ID)</h3>
+  <div class="grid">
+    <div class="field"><label>courtId</label><input id="f_courtId" value="2006"></div>
+    <div class="field"><label>departmentId</label><input id="f_departmentId" value="50079361"></div>
+    <div class="field full"><label>serviceName</label><input id="f_serviceName" value="TestyLomza"></div>
+    <div class="field"><label>username</label><input id="f_username" value="WR"></div>
+    <div class="field">
+      <label>finishDate</label>
+      <input type="datetime-local" id="f_finishDate">
+    </div>
+    <div class="field full">
+      <label>courtCaseId (po przecinku) <span class="id-counter" id="f_counter"></span></label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="f_caseIds" style="flex:1" oninput="updateCounter('f_caseIds','f_counter','f_warn')">
+        <label class="batch-btn">📂 Wczytaj plik<input type="file" class="batch-input" accept=".txt,.csv" onchange="loadBatchFile(this,'f_caseIds','f_counter','f_warn')"></label>
+      </div>
+      <span class="warn-empty" id="f_warn">⚠️ Pole ID jest puste – podaj przynajmniej jedno ID!</span>
+    </div>
+    <div class="field full"><label>SQL</label><textarea id="sql_finish"></textarea></div>
+  </div>
+  <div class="actions">
+    <button class="primary" onclick="generateFinish()">Generuj JSON</button>
+    <button onclick="copySQLField('sql_finish', this)">Kopiuj SQL</button>
+    <span class="copy-confirm">✅ Skopiowano!</span>
+  </div>
+</div>
+
+<!-- ===================== 3. ZAMYKANIE SPRAW PO SYGNATURZE ===================== -->
+<div id="endpoint-finishSig" class="endpoint">
+  <h3>Zamykanie spraw po sygnaturze</h3>
+  <div class="grid">
+    <div class="field"><label>courtId</label><input id="s_courtId" value="2006"></div>
+    <div class="field"><label>departmentId</label><input id="s_departmentId" value="50079361"></div>
+    <div class="field full"><label>serviceName</label><input id="s_serviceName" value="finishCourtCasesWithSignatures"></div>
+    <div class="field"><label>username</label><input id="s_username" value="WR"></div>
+    <div class="field">
+      <label>finishDate</label>
+      <input type="datetime-local" id="s_finishDate">
+    </div>
+    <div class="field full">
+      <label>
+        Sygnatury spraw (wklej sygnatury lub numery po przecinku)
+        <span class="id-counter" id="s_counter"></span>
+      </label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="s_orders" style="flex:1" placeholder="np. IV Ko 25/2026, IV K 35/2024 lub 25, 35, 45"
+          oninput="updateCounter('s_orders','s_counter','s_warn'); updateSigHint()">
+        <label class="batch-btn">📂 Wczytaj plik<input type="file" class="batch-input" accept=".txt,.csv" onchange="loadSigBatchFile(this)"></label>
+      </div>
+      <span class="warn-empty" id="s_warn">⚠️ Pole jest puste – podaj przynajmniej jedną sygnaturę!</span>
+      <span class="sig-hint">💡 Możesz wkleić pełne sygnatury (np. IV Ko 25/2026) – pola poniżej zostaną automatycznie zignorowane dla każdej sprawy.</span>
+      <span class="sig-parsed" id="s_parsed"></span>
+    </div>
+    <div class="field"><label>departmentNumberOrCode (domyślny)</label><input id="s_departmentNumberOrCode" value="IV"></div>
+    <div class="field"><label>repertoryCode (domyślny)</label><input id="s_repertoryCode" value="Ko"></div>
+    <div class="field"><label>year (domyślny)</label><input id="s_year" value="2026"></div>
+    <div class="field full"><label>SQL</label><textarea id="sql_finishSig"></textarea></div>
+  </div>
+  <div class="actions">
+    <button class="primary" onclick="generateFinishSig()">Generuj JSON</button>
+    <button onclick="copySQLField('sql_finishSig', this)">Kopiuj SQL</button>
+    <span class="copy-confirm">✅ Skopiowano!</span>
+  </div>
+</div>
+
+<!-- ===================== 4. WYŁĄCZENIE ZE SPRAWY ===================== -->
+<div id="endpoint-exclude" class="endpoint">
+  <h3>Wyłączenie ze sprawy</h3>
+  <div class="grid">
+    <div class="field"><label>courtId</label><input id="e_courtId" value="2006"></div>
+    <div class="field"><label>departmentId</label><input id="e_departmentId" value="50079361"></div>
+    <div class="field full"><label>serviceName</label><input id="e_serviceName" value="TestLomza"></div>
+    <div class="field"><label>username</label><input id="e_username" value="WR"></div>
+    <div class="field full">
+      <label>courtCaseId (po przecinku) <span class="id-counter" id="e_counter"></span></label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="e_caseIds" style="flex:1" oninput="updateCounter('e_caseIds','e_counter','e_warn')">
+        <label class="batch-btn">📂 Wczytaj plik<input type="file" class="batch-input" accept=".txt,.csv" onchange="loadBatchFile(this,'e_caseIds','e_counter','e_warn')"></label>
+      </div>
+      <span class="warn-empty" id="e_warn">⚠️ Pole ID jest puste!</span>
+    </div>
+    <div class="field"><label>excludedJudge.zsrkId</label><input id="e_zsrkId" value="00201571"></div>
+    <div class="field"><label>excludedJudge.firstName</label><input id="e_firstName" placeholder="null"></div>
+    <div class="field"><label>excludedJudge.lastName</label><input id="e_lastName" placeholder="null"></div>
+    <div class="field full"><label>exclusionReason</label><input id="e_reason" value="Wyłączenie - test Łomża"></div>
+    <div class="field"><label>replacingJudge</label><input id="e_replacing" placeholder="null"></div>
+    <div class="field"><label>keepSquad</label><input id="e_keepSquad" value="true"></div>
+    <div class="field"><label>oneTimeExclusion</label><input id="e_oneTime" value="false"></div>
+    <div class="field full"><label>SQL</label><textarea id="sql_exclude"></textarea></div>
+  </div>
+  <div class="actions">
+    <button class="primary" onclick="generateExclude()">Generuj JSON</button>
+    <button onclick="copySQLField('sql_exclude', this)">Kopiuj SQL</button>
+    <span class="copy-confirm">✅ Skopiowano!</span>
+  </div>
+</div>
+
+<!-- ===================== 5. ZAMIANA REFERENTA ===================== -->
+<div id="endpoint-changeRef" class="endpoint">
+  <h3>Zamiana referenta</h3>
+  <div class="grid">
+    <div class="field"><label>courtId</label><input id="cr_courtId" value="2006"></div>
+    <div class="field"><label>departmentId</label><input id="cr_departmentId" value="50079361"></div>
+    <div class="field full"><label>serviceName</label><input id="cr_serviceName" value="TestLomza"></div>
+    <div class="field"><label>username</label><input id="cr_username" value="WR"></div>
+    <div class="field full">
+      <label>courtCaseId (po przecinku) <span class="id-counter" id="cr_counter"></span></label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="cr_caseIds" style="flex:1" oninput="updateCounter('cr_caseIds','cr_counter','cr_warn')">
+        <label class="batch-btn">📂 Wczytaj plik<input type="file" class="batch-input" accept=".txt,.csv" onchange="loadBatchFile(this,'cr_caseIds','cr_counter','cr_warn')"></label>
+      </div>
+      <span class="warn-empty" id="cr_warn">⚠️ Pole ID jest puste!</span>
+    </div>
+    <div class="field"><label>excludedJudge.zsrkId</label><input id="cr_ex_zsrkId" value="00235744"></div>
+    <div class="field"><label>excludedJudge.firstName</label><input id="cr_ex_firstName" value="Aneta"></div>
+    <div class="field"><label>excludedJudge.lastName</label><input id="cr_ex_lastName" value="Golimowska"></div>
+    <div class="field full"><label>exclusionReason</label><input id="cr_reason" value="Zmiana referenta - test Łomża"></div>
+    <div class="field"><label>replacingJudge.zsrkId</label><input id="cr_rep_zsrkId" value="00219894"></div>
+    <div class="field"><label>replacingJudge.firstName</label><input id="cr_rep_firstName" value="Joanna"></div>
+    <div class="field"><label>replacingJudge.lastName</label><input id="cr_rep_lastName" value="Daros-Pawlyta"></div>
+    <div class="field"><label>keepSquad</label><input id="cr_keepSquad" value="true"></div>
+    <div class="field"><label>oneTimeExclusion</label><input id="cr_oneTime" value="true"></div>
+    <div class="field full"><label>SQL</label><textarea id="sql_changeRef"></textarea></div>
+  </div>
+  <div class="actions">
+    <button class="primary" onclick="generateChangeRef()">Generuj JSON</button>
+    <button onclick="copySQLField('sql_changeRef', this)">Kopiuj SQL</button>
+    <span class="copy-confirm">✅ Skopiowano!</span>
+  </div>
+</div>
+
+<!-- ===================== 6. POZOSTAŁE ===================== -->
+<div id="endpoint-other" class="endpoint">
+  <h3>Pozostałe</h3>
+
+  <div class="collapsible-header open" onclick="toggleSection(this)">
+    <h4>Usuwanie spraw po ID sprawy</h4><span class="arrow">▼</span>
+  </div>
+  <div class="collapsible-body" style="max-height:1000px;">
+    <div class="inner">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
+        <label style="margin:0;font-size:12px;color:#15803d;font-weight:bold;white-space:nowrap;">🏛️ Profil:</label>
+        <select style="flex:1;" onchange="applyOtherProfile('other1', this)"><option value="">— wybierz sąd —</option></select>
+      </div>
+      <div class="grid">
+        <div class="field"><label>courtId</label><input id="o1_courtId" value="2006"></div>
+        <div class="field"><label>departmentId</label><input id="o1_departmentId" value="50079361"></div>
+        <div class="field"><label>username</label><input id="o1_username" value="TestyLomza - WR"></div>
+        <div class="field"><label>courtCaseId</label><input id="o1_caseId" value="1234567"></div>
+        <div class="field full"><label>deleteReason</label><input id="o1_reason" value="Usuwanie - testy"></div>
+      </div>
+      <div class="actions"><button class="primary" onclick="generateOther1()">Generuj JSON</button></div>
+    </div>
+  </div>
+
+  <div class="collapsible-header open" onclick="toggleSection(this)">
+    <h4>Rozszerzenie składu sprawy</h4><span class="arrow">▼</span>
+  </div>
+  <div class="collapsible-body" style="max-height:1000px;">
+    <div class="inner">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
+        <label style="margin:0;font-size:12px;color:#15803d;font-weight:bold;white-space:nowrap;">🏛️ Profil:</label>
+        <select style="flex:1;" onchange="applyOtherProfile('other2', this)"><option value="">— wybierz sąd —</option></select>
+      </div>
+      <div class="grid">
+        <div class="field"><label>courtId</label><input id="o2_courtId" value="2006"></div>
+        <div class="field"><label>departmentId</label><input id="o2_departmentId" value="50079361"></div>
+        <div class="field"><label>username</label><input id="o2_username" value="TestyLomza - WR"></div>
+        <div class="field"><label>courtCaseId</label><input id="o2_caseId" value="98765"></div>
+        <div class="field"><label>judgesCount</label><input id="o2_judges" value="3"></div>
+        <div class="field"><label>primaryLayJudgesCount</label><input id="o2_primary" value="3"></div>
+        <div class="field"><label>additionalLayJudgesCount</label><input id="o2_additional" value="1"></div>
+        <div class="field"><label>isCurrentTrio</label><input id="o2_trio" value="true"></div>
+        <div class="field"><label>presidingJudgeOnly</label><input id="o2_presiding" value="false"></div>
+      </div>
+      <div class="actions"><button class="primary" onclick="generateOther2()">Generuj JSON</button></div>
+    </div>
+  </div>
+
+  <div class="collapsible-header open" onclick="toggleSection(this)">
+    <h4>Pobranie wyników z losowania dla wydziału</h4><span class="arrow">▼</span>
+  </div>
+  <div class="collapsible-body" style="max-height:1000px;">
+    <div class="inner">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
+        <label style="margin:0;font-size:12px;color:#15803d;font-weight:bold;white-space:nowrap;">🏛️ Profil:</label>
+        <select style="flex:1;" onchange="applyOtherProfile('other3', this)"><option value="">— wybierz sąd —</option></select>
+      </div>
+      <div class="grid">
+        <div class="field"><label>courtId</label><input id="o3_courtId" value="2006"></div>
+        <div class="field"><label>departmentId</label><input id="o3_departmentId" value="50079361"></div>
+        <div class="field full"><label>serviceName</label><input id="o3_serviceName" value="TestyLomza - WR"></div>
+        <div class="field"><label>drawDate</label><input id="o3_drawDate" value="2026-04-22"></div>
+      </div>
+      <div class="actions"><button class="primary" onclick="generateOther3()">Generuj JSON</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== WYNIK ===================== -->
+<div class="actions" style="margin-top:16px;">
+  <button class="secondary" onclick="copyJson()">📋 Kopiuj JSON</button>
+  <span class="copy-confirm" id="jsonCopyConfirm">✅ Skopiowano!</span>
+</div>
+<div class="field full" style="margin-top:8px;">
+  <label>Wygenerowany JSON</label>
+  <pre id="output-pre"></pre>
+</div>
+
+</div><!-- /container -->
+
+<!-- ===================== MODAL ZARZĄDZANIA PROFILAMI ===================== -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;">⚙️ Zarządzanie profilami sądów</h2>
+      <button onclick="closeProfileEditor()" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+
+    <div class="modal-tabs" id="modalTabs">
+      <div class="modal-tab active" onclick="switchModalTab('add')">Dodawanie spraw</div>
+      <div class="modal-tab" onclick="switchModalTab('finish')">Zamykanie (po ID)</div>
+      <div class="modal-tab" onclick="switchModalTab('finishSig')">Zamykanie (sygnatura)</div>
+      <div class="modal-tab" onclick="switchModalTab('exclude')">Wyłączenie</div>
+      <div class="modal-tab" onclick="switchModalTab('changeRef')">Zamiana referenta</div>
+      <div class="modal-tab" onclick="switchModalTab('other1')">Usuwanie</div>
+      <div class="modal-tab" onclick="switchModalTab('other2')">Rozszerzenie</div>
+      <div class="modal-tab" onclick="switchModalTab('other3')">Wyniki losowania</div>
+    </div>
+
+    <div id="modal-content-wrapper"></div>
+
+    <div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px;">
+      <button class="danger" onclick="if(confirm('Na pewno wyczyścić wszystkie profile?')) { profiles=getDefaultProfiles(); saveProfiles(); renderModal(); renderProfileSelect(); }">🗑️ Resetuj do domyślnych</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// PROFILE SYSTEM
+// ════════════════════════════════════════════════════════════════
+
+// Definicja pól per endpoint
+const ENDPOINT_FIELDS = {
+  add:       ['CourtId','DepartmentId','CategorySymbolId','RepertoryId','DepartmentNumberOrCode'],
+  finish:    ['courtId','departmentId'],
+  finishSig: ['courtId','departmentId'],
+  exclude:   ['courtId','departmentId'],
+  changeRef: ['courtId','departmentId'],
+  other1:    ['courtId','departmentId'],
+  other2:    ['courtId','departmentId'],
+  other3:    ['courtId','departmentId'],
+};
+
+// Mapowanie pól profilu → id inputów na formularzu
+const FIELD_MAP = {
+  add: {
+    CourtId:               'a_CourtId',
+    DepartmentId:          'a_DepartmentId',
+    CategorySymbolId:      'a_CategorySymbolId',
+    RepertoryId:           'a_RepertoryId',
+    DepartmentNumberOrCode:'a_DepartmentNumberOrCode',
+  },
+  finish:    { courtId:'f_courtId', departmentId:'f_departmentId' },
+  finishSig: { courtId:'s_courtId', departmentId:'s_departmentId' },
+  exclude:   { courtId:'e_courtId', departmentId:'e_departmentId' },
+  changeRef: { courtId:'cr_courtId', departmentId:'cr_departmentId' },
+  other1:    { courtId:'o1_courtId', departmentId:'o1_departmentId' },
+  other2:    { courtId:'o2_courtId', departmentId:'o2_departmentId' },
+  other3:    { courtId:'o3_courtId', departmentId:'o3_departmentId' },
+};
+
+const FRIENDLY_LABELS = {
+  CourtId:'CourtId', DepartmentId:'DepartmentId', CategorySymbolId:'CategorySymbolId',
+  RepertoryId:'RepertoryId', DepartmentNumberOrCode:'DepartmentNumberOrCode',
+  courtId:'courtId', departmentId:'departmentId',
+};
+
+function getDefaultProfiles() {
+  return {
+    add: [
+      { name:'SA Kraków – I Wydz. Cywilny ACa',    CourtId:'2006', DepartmentId:'50079361', CategorySymbolId:'5352', RepertoryId:'341', DepartmentNumberOrCode:'I' },
+      { name:'SA Kraków – I Wydz. Cywilny ACo',    CourtId:'2006', DepartmentId:'50079361', CategorySymbolId:'5581', RepertoryId:'345', DepartmentNumberOrCode:'I' },
+      { name:'SA Kraków – I Wydz. Cywilny AGz',    CourtId:'2006', DepartmentId:'50079361', CategorySymbolId:'5560', RepertoryId:'344', DepartmentNumberOrCode:'I' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod. Co-SO',CourtId:'3012', DepartmentId:'50272747', CategorySymbolId:'4637', RepertoryId:'319', DepartmentNumberOrCode:'II' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod. Cz',   CourtId:'3012', DepartmentId:'50272747', CategorySymbolId:'7728', RepertoryId:'332', DepartmentNumberOrCode:'II' },
+      { name:'SO Gdańsk – Sekcja Rodz. Ca-Rodz.',  CourtId:'3012', DepartmentId:'50272759', CategorySymbolId:'5103', RepertoryId:'333', DepartmentNumberOrCode:'II' },
+      { name:'SO Gdańsk – Sekcja Rodz. ZAŻ.',      CourtId:'3012', DepartmentId:'50272759', CategorySymbolId:'5667', RepertoryId:'388', DepartmentNumberOrCode:'II' },
+      { name:'SR Nysa – II Wydz. Karny Ko',         CourtId:'4006', DepartmentId:'50061507', CategorySymbolId:'6119', RepertoryId:'374', DepartmentNumberOrCode:'II' },
+      { name:'SR Nysa – II Wydz. Karny K-SR',       CourtId:'4006', DepartmentId:'50061507', CategorySymbolId:'5625', RepertoryId:'371', DepartmentNumberOrCode:'II' },
+      { name:'SR Nysa – Sekcja Wykroczeń W',        CourtId:'4006', DepartmentId:'50061571', CategorySymbolId:'5628', RepertoryId:'372', DepartmentNumberOrCode:'II' },
+      { name:'SR Łomża – I Wydz. Cywilny 1Co-SO',  CourtId:'4039', DepartmentId:'50300758', CategorySymbolId:'7656', RepertoryId:'463', DepartmentNumberOrCode:'I' },
+      { name:'SR Łomża – I Wydz. Cywilny Nc-SR',   CourtId:'4039', DepartmentId:'50300758', CategorySymbolId:'3927', RepertoryId:'294', DepartmentNumberOrCode:'I' },
+    ],
+    finish: [
+      { name:'SA Kraków – I Wydz. Cywilny',    courtId:'2006', departmentId:'50079361' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod.',  courtId:'3012', departmentId:'50272747' },
+      { name:'SO Gdańsk – Sekcja Rodzinnych',  courtId:'3012', departmentId:'50272759' },
+      { name:'SR Nysa – II Wydz. Karny',        courtId:'4006', departmentId:'50061507' },
+      { name:'SR Nysa – Sekcja Wykroczeń',      courtId:'4006', departmentId:'50061571' },
+      { name:'SR Łomża – I Wydz. Cywilny',     courtId:'4039', departmentId:'50300758' },
+    ],
+    finishSig: [
+      { name:'SA Kraków – I Wydz. Cywilny',    courtId:'2006', departmentId:'50079361' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod.',  courtId:'3012', departmentId:'50272747' },
+      { name:'SO Gdańsk – Sekcja Rodzinnych',  courtId:'3012', departmentId:'50272759' },
+      { name:'SR Nysa – II Wydz. Karny',        courtId:'4006', departmentId:'50061507' },
+      { name:'SR Nysa – Sekcja Wykroczeń',      courtId:'4006', departmentId:'50061571' },
+      { name:'SR Łomża – I Wydz. Cywilny',     courtId:'4039', departmentId:'50300758' },
+    ],
+    exclude: [
+      { name:'SA Kraków – I Wydz. Cywilny',    courtId:'2006', departmentId:'50079361' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod.',  courtId:'3012', departmentId:'50272747' },
+      { name:'SO Gdańsk – Sekcja Rodzinnych',  courtId:'3012', departmentId:'50272759' },
+      { name:'SR Nysa – II Wydz. Karny',        courtId:'4006', departmentId:'50061507' },
+      { name:'SR Nysa – Sekcja Wykroczeń',      courtId:'4006', departmentId:'50061571' },
+      { name:'SR Łomża – I Wydz. Cywilny',     courtId:'4039', departmentId:'50300758' },
+    ],
+    changeRef: [
+      { name:'SA Kraków – I Wydz. Cywilny',    courtId:'2006', departmentId:'50079361' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod.',  courtId:'3012', departmentId:'50272747' },
+      { name:'SO Gdańsk – Sekcja Rodzinnych',  courtId:'3012', departmentId:'50272759' },
+      { name:'SR Nysa – II Wydz. Karny',        courtId:'4006', departmentId:'50061507' },
+      { name:'SR Nysa – Sekcja Wykroczeń',      courtId:'4006', departmentId:'50061571' },
+      { name:'SR Łomża – I Wydz. Cywilny',     courtId:'4039', departmentId:'50300758' },
+    ],
+    other1: [
+      { name:'SA Kraków – I Wydz. Cywilny',    courtId:'2006', departmentId:'50079361' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod.',  courtId:'3012', departmentId:'50272747' },
+      { name:'SO Gdańsk – Sekcja Rodzinnych',  courtId:'3012', departmentId:'50272759' },
+      { name:'SR Nysa – II Wydz. Karny',        courtId:'4006', departmentId:'50061507' },
+      { name:'SR Nysa – Sekcja Wykroczeń',      courtId:'4006', departmentId:'50061571' },
+      { name:'SR Łomża – I Wydz. Cywilny',     courtId:'4039', departmentId:'50300758' },
+    ],
+    other2: [
+      { name:'SA Kraków – I Wydz. Cywilny',    courtId:'2006', departmentId:'50079361' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod.',  courtId:'3012', departmentId:'50272747' },
+      { name:'SO Gdańsk – Sekcja Rodzinnych',  courtId:'3012', departmentId:'50272759' },
+      { name:'SR Nysa – II Wydz. Karny',        courtId:'4006', departmentId:'50061507' },
+      { name:'SR Nysa – Sekcja Wykroczeń',      courtId:'4006', departmentId:'50061571' },
+      { name:'SR Łomża – I Wydz. Cywilny',     courtId:'4039', departmentId:'50300758' },
+    ],
+    other3: [
+      { name:'SA Kraków – I Wydz. Cywilny',    courtId:'2006', departmentId:'50079361' },
+      { name:'SO Gdańsk – II Wydz. Cyw-Rod.',  courtId:'3012', departmentId:'50272747' },
+      { name:'SO Gdańsk – Sekcja Rodzinnych',  courtId:'3012', departmentId:'50272759' },
+      { name:'SR Nysa – II Wydz. Karny',        courtId:'4006', departmentId:'50061507' },
+      { name:'SR Nysa – Sekcja Wykroczeń',      courtId:'4006', departmentId:'50061571' },
+      { name:'SR Łomża – I Wydz. Cywilny',     courtId:'4039', departmentId:'50300758' },
+    ],
+  };
+}
+
+let profiles = loadProfiles();
+
+function loadProfiles() {
+  try {
+    const raw = localStorage.getItem('sąd_profiles');
+    return raw ? JSON.parse(raw) : getDefaultProfiles();
+  } catch { return getDefaultProfiles(); }
+}
+
+function saveProfiles() {
+  localStorage.setItem('sąd_profiles', JSON.stringify(profiles));
+}
+
+// Klucz endpointu → klucz w profiles
+function endpointToProfileKey(ep) {
+  if (ep === 'other') return null; // "other" obsługiwany przez modal per sub-sekcja
+  return ep;
+}
+
+function renderProfileSelect() {
+  const ep = endpointSelect.value;
+  const key = endpointToProfileKey(ep);
+  const sel = document.getElementById('profileSelect');
+  sel.innerHTML = '<option value="">— wybierz profil —</option>';
+  if (!key || !profiles[key]) return;
+  profiles[key].forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+}
+
+function applyProfile() {
+  const ep = endpointSelect.value;
+  const key = endpointToProfileKey(ep);
+  if (!key) return;
+  const idx = document.getElementById('profileSelect').value;
+  if (idx === '') return;
+  const profile = profiles[key][Number(idx)];
+  if (!profile) return;
+  const map = FIELD_MAP[key] || {};
+  Object.entries(map).forEach(([profileField, inputId]) => {
+    const el = document.getElementById(inputId);
+    if (el && profile[profileField] !== undefined) el.value = profile[profileField];
+  });
+  if (liveModeChk.checked) triggerGenerate(null);
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+// ── Profile selects dla sub-sekcji "Pozostałe" ───────────────────────────────
+function renderOtherProfileSelects() {
+  ['other1','other2','other3'].forEach(key => {
+    document.querySelectorAll(`#endpoint-other select[onchange*="${key}"]`).forEach(sel => {
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— wybierz sąd —</option>';
+      (profiles[key] || []).forEach((p, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+      });
+      sel.value = current;
+    });
+  });
+}
+
+function applyOtherProfile(key, selectEl) {
+  const idx = selectEl.value;
+  if (idx === '') return;
+  const profile = profiles[key]?.[Number(idx)];
+  if (!profile) return;
+  const map = FIELD_MAP[key] || {};
+  Object.entries(map).forEach(([profileField, inputId]) => {
+    const el = document.getElementById(inputId);
+    if (el && profile[profileField] !== undefined) el.value = profile[profileField];
+  });
+  const firstInputId = Object.values(map)[0];
+  if (liveModeChk.checked) triggerGenerate(document.getElementById(firstInputId));
+}
+
+let currentModalTab = 'add';
+
+function openProfileEditor() {
+  currentModalTab = endpointSelect.value === 'other' ? 'add' : endpointSelect.value;
+  renderModal();
+  document.getElementById('profileModal').classList.add('open');
+}
+
+function closeProfileEditor() {
+  document.getElementById('profileModal').classList.remove('open');
+  renderProfileSelect();
+  renderOtherProfileSelects();
+}
+
+const TAB_LABELS = {
+  add:'Dodawanie spraw', finish:'Zamykanie (po ID)', finishSig:'Zamykanie (sygnatura)',
+  exclude:'Wyłączenie', changeRef:'Zamiana referenta',
+  other1:'Usuwanie', other2:'Rozszerzenie', other3:'Wyniki losowania'
+};
+
+function switchModalTab(tab) {
+  currentModalTab = tab;
+  renderModal();
+}
+
+function renderModal() {
+  // tabs
+  const tabsEl = document.getElementById('modalTabs');
+  tabsEl.innerHTML = Object.entries(TAB_LABELS).map(([k,v]) =>
+    `<div class="modal-tab ${k===currentModalTab?'active':''}" onclick="switchModalTab('${k}')">${v}</div>`
+  ).join('');
+
+  const key = currentModalTab;
+  const list = profiles[key] || [];
+  const fields = ENDPOINT_FIELDS[key] || [];
+
+  let html = `<div class="profile-list" id="profile-list">`;
+  list.forEach((p, i) => {
+    const details = fields.filter(f=>f!=='name').map(f=>`${f}: ${p[f]||'–'}`).join(' | ');
+    html += `<div class="profile-item">
+      <div>
+        <div class="profile-item-name">${p.name}</div>
+        <div class="profile-item-details">${details}</div>
+      </div>
+      <div class="profile-item-actions">
+        <button onclick="editProfile('${key}',${i})" style="padding:4px 8px;font-size:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;cursor:pointer;">✏️</button>
+        <button onclick="deleteProfile('${key}',${i})" style="padding:4px 8px;font-size:12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:4px;cursor:pointer;">🗑️</button>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  html += `<div style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:12px;">
+    <strong style="font-size:13px;">➕ Dodaj nowy profil</strong>
+    <div class="profile-form" style="margin-top:8px;" id="new-profile-form">
+      <div class="pf-full"><label>Nazwa profilu</label><input id="nf_name" placeholder="np. SR Łomża – I Wydz. Cywilny Co-SO"></div>`;
+
+  fields.forEach(f => {
+    html += `<div><label>${f}</label><input id="nf_${f}" placeholder="${f}"></div>`;
+  });
+
+  html += `</div>
+    <div class="actions" style="margin-top:8px;">
+      <button class="primary" onclick="addProfile('${key}')">Dodaj profil</button>
+    </div>
+  </div>`;
+
+  document.getElementById('modal-content-wrapper').innerHTML = html;
+}
+
+function addProfile(key) {
+  const fields = ENDPOINT_FIELDS[key] || [];
+  const name = document.getElementById('nf_name').value.trim();
+  if (!name) { alert('Podaj nazwę profilu!'); return; }
+  const obj = { name };
+  fields.forEach(f => { obj[f] = document.getElementById(`nf_${f}`).value.trim(); });
+  profiles[key].push(obj);
+  saveProfiles();
+  renderModal();
+}
+
+function deleteProfile(key, i) {
+  if (!confirm(`Usunąć profil "${profiles[key][i].name}"?`)) return;
+  profiles[key].splice(i, 1);
+  saveProfiles();
+  renderModal();
+}
+
+function editProfile(key, i) {
+  const p = profiles[key][i];
+  const fields = ENDPOINT_FIELDS[key] || [];
+  const newName = prompt('Nazwa profilu:', p.name);
+  if (newName === null) return;
+  p.name = newName.trim() || p.name;
+  fields.forEach(f => {
+    const val = prompt(`${f}:`, p[f] || '');
+    if (val !== null) p[f] = val.trim();
+  });
+  saveProfiles();
+  renderModal();
+}
+
+// ════════════════════════════════════════════════════════════════
+// SIGNATURE PARSER – zamykanie po sygnaturze
+// ════════════════════════════════════════════════════════════════
+
+// Parsuje sygnatury w formatach:
+//   "IV Ko 25/2026"  → pełna (4-cyfrowy rok)
+//   "I AGz 218/26"   → pełna (2-cyfrowy rok → 20xx)
+//   "Ko 25/2026"     → bez wydziału
+//   "25/2026"        → tylko numer/rok
+//   "25"             → sam numer (używa domyślnych pól)
+function parseSignature(raw) {
+  const s = raw.trim();
+
+  function expandYear(y) {
+    // "26" → "2026", "99" → "2099", "2026" → "2026"
+    if (y.length <= 2) return String(2000 + Number(y));
+    return y;
+  }
+
+  // Pełna sygnatura: "WYDZIAŁ REPO NUMER/ROK"  (rok 2- lub 4-cyfrowy)
+  // WYDZIAŁ może być np. "I", "II", "IV" ale też "I-V" itp.
+  // REPO może zawierać litery i myślnik, np. "AGz", "K-SR", "Co-SO"
+  const full = s.match(/^(\S+)\s+([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ][A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ\-]*)\s+(\d+)\/(\d{2,4})$/);
+  if (full) return { dept: full[1], repo: full[2], order: full[3], year: expandYear(full[4]) };
+
+  // Bez wydziału: "REPO NUMER/ROK"
+  const noDiv = s.match(/^([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ][A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ\-]*)\s+(\d+)\/(\d{2,4})$/);
+  if (noDiv) return { repo: noDiv[1], order: noDiv[2], year: expandYear(noDiv[3]) };
+
+  // Tylko numer/rok: "25/2026" lub "25/26"
+  const numYear = s.match(/^(\d+)\/(\d{2,4})$/);
+  if (numYear) return { order: numYear[1], year: expandYear(numYear[2]) };
+
+  // Sam numer – używa domyślnych pól formularza
+  if (/^\d+$/.test(s)) return { order: s };
+
+  return null;
+}
+
+function updateSigHint() {
+  const raw = document.getElementById('s_orders').value;
+  const items = raw.split(',').map(v => v.trim()).filter(Boolean);
+  const parsedEl = document.getElementById('s_parsed');
+  if (!items.length) { parsedEl.style.display='none'; return; }
+
+  const hasFull = items.some(s => parseSignature(s) && parseSignature(s).dept);
+  if (hasFull) {
+    parsedEl.style.display = 'block';
+    parsedEl.textContent = `✅ Wykryto pełne sygnatury – każda sprawa otrzyma własne dept/repo/order/year`;
+  } else {
+    parsedEl.style.display = 'none';
+  }
+}
+
+function loadSigBatchFile(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const raw = e.target.result;
+    const items = raw.split(/[\n\r;]+/).map(v => v.trim()).filter(Boolean);
+    document.getElementById('s_orders').value = items.join(', ');
+    updateCounter('s_orders','s_counter','s_warn');
+    updateSigHint();
+    if (liveModeChk.checked) triggerGenerate(null);
+  };
+  reader.readAsText(file);
+  fileInput.value = '';
+}
+
+// ════════════════════════════════════════════════════════════════
+// ENDPOINT SWITCHING
+// ════════════════════════════════════════════════════════════════
+const endpointSelect = document.getElementById('endpointSelect');
+endpointSelect.addEventListener('change', () => {
+  document.querySelectorAll('.endpoint').forEach(e => e.classList.remove('active'));
+  document.getElementById('endpoint-' + endpointSelect.value).classList.add('active');
+  document.getElementById('output-pre').innerHTML = '';
+  document.getElementById('output-pre')._raw = '';
+  renderProfileSelect();
+});
+
+// ── Live mode ─────────────────────────────────────────────────────────────────
+const liveModeChk = document.getElementById('liveMode');
+const liveBadge   = document.getElementById('liveBadge');
+liveModeChk.addEventListener('change', () => {
+  liveBadge.style.display = liveModeChk.checked ? 'inline' : 'none';
+});
+
+const otherPrefixes = [
+  { prefix: 'o1_', fn: () => generateOther1() },
+  { prefix: 'o2_', fn: () => generateOther2() },
+  { prefix: 'o3_', fn: () => generateOther3() },
+];
+
+function triggerGenerate(changedEl) {
+  const v = endpointSelect.value;
+  if      (v === 'add')       generateAdd();
+  else if (v === 'finish')    generateFinish();
+  else if (v === 'finishSig') generateFinishSig();
+  else if (v === 'exclude')   generateExclude();
+  else if (v === 'changeRef') generateChangeRef();
+  else if (v === 'other' && changedEl) {
+    const id = changedEl.id || '';
+    const match = otherPrefixes.find(p => id.startsWith(p.prefix));
+    if (match) match.fn();
+  }
+}
+
+document.addEventListener('input', e => { if (liveModeChk.checked) triggerGenerate(e.target); });
+document.addEventListener('change', e => { if (liveModeChk.checked) triggerGenerate(e.target); });
+
+// ── Collapsible ───────────────────────────────────────────────────────────────
+function toggleSection(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  body.style.maxHeight = header.classList.contains('open') ? body.scrollHeight + 'px' : '0';
+}
+
+// ── Counter + ostrzeżenie ─────────────────────────────────────────────────────
+function updateCounter(inputId, counterId, warnId) {
+  const val  = document.getElementById(inputId).value;
+  const items = val.split(',').map(v => v.trim()).filter(Boolean);
+  const n = items.length;
+  document.getElementById(counterId).textContent = n > 0
+    ? `(${n} ${n===1?'pozycja':n<5?'pozycje':'pozycji'})` : '';
+  document.getElementById(warnId).style.display = val.trim() === '' ? 'block' : 'none';
+}
+
+// ── Batch load ────────────────────────────────────────────────────────────────
+function loadBatchFile(fileInput, targetId, counterId, warnId) {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const ids = e.target.result.split(/[\n\r,;\t]+/).map(v=>v.trim()).filter(Boolean);
+    document.getElementById(targetId).value = ids.join(', ');
+    updateCounter(targetId, counterId, warnId);
+    if (liveModeChk.checked) triggerGenerate(null);
+  };
+  reader.readAsText(file);
+  fileInput.value = '';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function parseNull(v) { return v===''||v==='null' ? null : v; }
+
+function datetimeToISO(id) {
+  const v = document.getElementById(id)?.value;
+  return v ? new Date(v).toISOString() : '';
+}
+
+function nowDatetimeLocal() {
+  const n = new Date();
+  return n.toISOString().slice(0,16);
+}
+
+// ── JSON output ───────────────────────────────────────────────────────────────
+function highlightJSON(json) {
+  return json
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="json-key">${m}</span>` : `<span class="json-string">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="json-bool">${m}</span>`;
+      if (/null/.test(m)) return `<span class="json-null">${m}</span>`;
+      return `<span class="json-number">${m}</span>`;
+    });
+}
+
+function setOutput(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  const pre = document.getElementById('output-pre');
+  pre.innerHTML = highlightJSON(json);
+  pre._raw = json;
+}
+
+function copyJson() {
+  const raw = document.getElementById('output-pre')._raw || '';
+  if (!raw) return;
+  navigator.clipboard.writeText(raw).then(() => {
+    const c = document.getElementById('jsonCopyConfirm');
+    c.style.display = 'inline';
+    setTimeout(() => c.style.display = 'none', 2000);
+  });
+}
+
+function copySQLField(id, btn) {
+  const text = document.getElementById(id).value;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const c = btn.nextElementSibling;
+    if (c?.classList.contains('copy-confirm')) {
+      c.style.display = 'inline';
+      setTimeout(() => c.style.display = 'none', 2000);
+    }
+  });
+}
+
+function showWarn(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+// ════════════════════════════════════════════════════════════════
+// GENERATORY
+// ════════════════════════════════════════════════════════════════
+
+function generateAdd() {
+  const start = Number(a_StartOrder.value), count = Number(a_Count.value);
+  const cases = [];
+  for (let i = 0; i < count; i++) {
+    cases.push({
+      JudgesCount: a_JudgesCount.value,
+      CategorySymbolId: a_CategorySymbolId.value,
+      PrimaryLayJudgesCount: a_PrimaryLayJudgesCount.value,
+      AdditionalLayJudgesCount: a_AdditionalLayJudgesCount.value,
+      IsCurrentTrio: a_IsCurrentTrio.value,
+      PresidingJudgeOnly: parseNull(a_PresidingJudgeOnly.value),
+      Username: a_Username.value,
+      IsDrawFromAllJudgesWithHolidays: a_IsDrawFromAllJudgesWithHolidays.value,
+      CaseSignature: {
+        RepertoryId: a_RepertoryId.value,
+        OrderNumber: String(start + i),
+        Year: a_Year.value,
+        DepartmentNumberOrCode: a_DepartmentNumberOrCode.value
+      }
+    });
+  }
+  setOutput({ CourtId: a_CourtId.value, DepartmentId: a_DepartmentId.value, serviceName: a_serviceName.value, courtCases: cases });
+}
+
+function generateFinish() {
+  const ids = f_caseIds.value.split(',').map(v=>v.trim()).filter(Boolean);
+  if (!ids.length) { showWarn('f_warn'); return; }
+  setOutput({
+    courtId: f_courtId.value, departmentId: f_departmentId.value, serviceName: f_serviceName.value,
+    courtCases: ids.map(id => ({ username: f_username.value, courtCaseId: Number(id), finishDate: datetimeToISO('f_finishDate') }))
+  });
+}
+
+function generateFinishSig() {
+  const raw = s_orders.value.split(',').map(v=>v.trim()).filter(Boolean);
+  if (!raw.length) { showWarn('s_warn'); return; }
+
+  const defaultDept = s_departmentNumberOrCode.value;
+  const defaultRepo = s_repertoryCode.value;
+  const defaultYear = Number(s_year.value);
+
+  const courtCases = raw.map(entry => {
+    const parsed = parseSignature(entry);
+    if (parsed && parsed.dept) {
+      // Pełna sygnatura – użyj sparsowanych wartości
+      return {
+        username: s_username.value,
+        finishDate: datetimeToISO('s_finishDate'),
+        caseSignature: {
+          departmentNumberOrCode: parsed.dept,
+          repertoryCode: parsed.repo || defaultRepo,
+          orderNumber: parsed.order,
+          year: Number(parsed.year || defaultYear)
+        }
+      };
+    } else if (parsed) {
+      // Częściowa sygnatura – uzupełnij domyślnymi
+      return {
+        username: s_username.value,
+        finishDate: datetimeToISO('s_finishDate'),
+        caseSignature: {
+          departmentNumberOrCode: parsed.dept || defaultDept,
+          repertoryCode: parsed.repo || defaultRepo,
+          orderNumber: parsed.order,
+          year: Number(parsed.year || defaultYear)
+        }
+      };
+    } else {
+      // Niezrozumiałe – wstaw jako orderNumber z domyślnymi
+      return {
+        username: s_username.value,
+        finishDate: datetimeToISO('s_finishDate'),
+        caseSignature: {
+          departmentNumberOrCode: defaultDept,
+          repertoryCode: defaultRepo,
+          orderNumber: entry,
+          year: defaultYear
+        }
+      };
+    }
+  });
+
+  setOutput({ courtId: s_courtId.value, departmentId: s_departmentId.value, serviceName: s_serviceName.value, courtCases });
+}
+
+function generateExclude() {
+  const ids = e_caseIds.value.split(',').map(v=>v.trim()).filter(Boolean);
+  if (!ids.length) { showWarn('e_warn'); return; }
+  setOutput(ids.map(id => ({
+    courtId: e_courtId.value, departmentId: e_departmentId.value, serviceName: e_serviceName.value,
+    username: e_username.value, courtCaseId: Number(id),
+    excludedJudge: { zsrkId: e_zsrkId.value, firstName: parseNull(e_firstName.value), lastName: parseNull(e_lastName.value) },
+    exclusionReason: e_reason.value, replacingJudge: parseNull(e_replacing.value),
+    keepSquad: e_keepSquad.value==='true', oneTimeExclusion: e_oneTime.value==='true'
+  })));
+}
+
+function generateChangeRef() {
+  const ids = cr_caseIds.value.split(',').map(v=>v.trim()).filter(Boolean);
+  if (!ids.length) { showWarn('cr_warn'); return; }
+  setOutput(ids.map(id => ({
+    courtId: cr_courtId.value, departmentId: cr_departmentId.value, serviceName: cr_serviceName.value,
+    username: cr_username.value, courtCaseId: Number(id),
+    excludedJudge: { zsrkId: cr_ex_zsrkId.value, firstName: parseNull(cr_ex_firstName.value), lastName: parseNull(cr_ex_lastName.value) },
+    exclusionReason: cr_reason.value,
+    replacingJudge: { zsrkId: cr_rep_zsrkId.value, firstName: parseNull(cr_rep_firstName.value), lastName: parseNull(cr_rep_lastName.value) },
+    keepSquad: cr_keepSquad.value==='true', oneTimeExclusion: cr_oneTime.value==='true'
+  })));
+}
+
+function generateOther1() {
+  setOutput({ courtId: o1_courtId.value, departmentId: o1_departmentId.value, username: o1_username.value, courtCaseId: Number(o1_caseId.value), deleteReason: o1_reason.value });
+}
+function generateOther2() {
+  setOutput({ courtId: o2_courtId.value, departmentId: o2_departmentId.value, username: o2_username.value, courtCaseId: Number(o2_caseId.value), judgesCount: Number(o2_judges.value), primaryLayJudgesCount: Number(o2_primary.value), additionalLayJudgesCount: Number(o2_additional.value), isCurrentTrio: o2_trio.value==='true', presidingJudgeOnly: o2_presiding.value==='true' });
+}
+function generateOther3() {
+  setOutput({ courtId: o3_courtId.value, departmentId: o3_departmentId.value, serviceName: o3_serviceName.value, drawDate: o3_drawDate.value });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+// Ustaw domyślną datę na teraz
+document.getElementById('f_finishDate').value = nowDatetimeLocal();
+document.getElementById('s_finishDate').value = nowDatetimeLocal();
+
+renderProfileSelect();
+renderOtherProfileSelects();
+</script>
+</body>
+</html>
